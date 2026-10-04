@@ -2,12 +2,15 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-0U5xqV7zKQ3sZqnP3Yo3wt1iT28rWUxFEvYH1KVuGfw=' 'sha256-xabneslT/c9AsVFnTtnuddFQdgVK4Fpz1bnb5sDHZcw='; style-src 'sha256-GKGS27oMfnDgftcXqowho2B5u4E6aslHXwreI6rPfrU='; img-src data: blob:; font-src 'none'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>QI文字成画</title>
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
+  /* 工具类：原先写成内联 margin-top 属性的两处，为配合
+     style-src 哈希白名单（不允许 'unsafe-inline'）统一挪到 CSS 里。 */
+  .mt8{margin-top:8px;}
 
   :root{
     --tx1:#2C2C2E;
@@ -852,7 +855,7 @@
         </div>
         <button type="button" class="miniBtn" id="btnReshuffle">↻ 换一批文字</button>
 
-        <div class="seg hide" id="segStrict" style="margin-top:8px">
+        <div class="seg hide mt8" id="segStrict">
           <button type="button" data-strict="loose">宽松</button>
           <button type="button" data-strict="normal" class="on">标准</button>
           <button type="button" data-strict="strict">严格</button>
@@ -864,7 +867,7 @@
             点词可排除，再点一次恢复
           </div>
           <div class="fpChips" id="fpChips"></div>
-          <button type="button" class="miniBtn" id="btnFpReset" style="margin-top:8px">清空排除</button>
+          <button type="button" class="miniBtn mt8" id="btnFpReset">清空排除</button>
         </div>
 
         <div class="hint">
@@ -1017,6 +1020,21 @@ var MASK_MAX_PX = 224;     /* 蒙版最长边像素 */
 var CLOUD_STEP  = 3;       /* 词云占位网格粒度(px) */
 var CLOUD_RETRY = [1, 0.74, 0.55, 0.40];   /* 放不下时逐级缩小字号的倍率 */
 var MIN_GLYPH   = 3.2;     /* 最小可读字号(px)：小于此值不绘制 */
+
+/* 输入上限：任何外部文件先看 file.size，绝不把超大文件读进内存。
+   EPUB 额外做 zip bomb 防护（单条目 + 累计解压量 + 条目数 三重限制）。 */
+var MAX_TEXT_BYTES   = 24 * 1024 * 1024;   /* TXT / HTML / EPUB 文件上限 24MB */
+var MAX_IMAGE_BYTES  = 32 * 1024 * 1024;   /* 图片文件上限 32MB */
+var MAX_TEXT_CHARS   = 12 * 1000 * 1000;   /* 清洗后文本上限 1200 万字符 */
+var MAX_IMG_PIXELS   = 40 * 1000 * 1000;   /* 图片解码后像素上限 4000 万 */
+var MAX_EPUB_ENTRY   = 8 * 1024 * 1024;    /* EPUB 单条目解压后上限 8MB */
+var MAX_EPUB_TOTAL   = 96 * 1024 * 1024;   /* EPUB 全部条目解压累计上限 96MB */
+var MAX_EPUB_ENTRIES = 5000;               /* EPUB 条目数上限 */
+
+function fmtMB(n){ return (n / 1048576).toFixed(1) + 'MB'; }
+function tooBig(what, size, limit){
+  toast(what + '超过 ' + fmtMB(limit) + ' 上限（当前 ' + fmtMB(size) + '），已拒绝载入');
+}
 
 /* ============================================================
    1. 默认参数
@@ -2171,12 +2189,21 @@ function blocksToText(docs, bilingual){
    ============================================================ */
 async function parseEPUB(file){
   if(!window.JSZip) throw new Error('JSZip 未加载，EPUB 解析组件不可用');
+  if(file && file.size > MAX_TEXT_BYTES){
+    throw new Error('EPUB 文件 ' + fmtMB(file.size) + ' 超过 ' + fmtMB(MAX_TEXT_BYTES) + ' 上限');
+  }
 
   var zip;
   try{
     zip = await JSZip.loadAsync(file);
   }catch(e){
     throw new Error('EPUB 解压失败（文件损坏或不是有效的 ZIP）');
+  }
+
+  /* zip bomb 防护之一：条目数 */
+  var entryNames = Object.keys(zip.files);
+  if(entryNames.length > MAX_EPUB_ENTRIES){
+    throw new Error('EPUB 条目数 ' + entryNames.length + ' 超过 ' + MAX_EPUB_ENTRIES + ' 上限');
   }
 
   var opfPath = null;
@@ -2236,13 +2263,29 @@ async function parseEPUB(file){
   var encSet = {};
   var garbled = false;
   var failed = 0;
+  var epubUncompressed = 0;   /* zip bomb 防护：累计实际解压字节 */
 
   for(var n = 0; n < spineHrefs.length; n++){
     var full = resolvePath(opfDir, spineHrefs[n]);
     var f = zip.file(full) || zip.file(decodeURIComponent(full));
     if(!f){ failed++; continue; }
 
+    /* zip bomb 防护之二：先读 ZIP 头里声明的解压后大小，超限直接跳过，
+       不在内存里展开 —— 这是唯一能在解压前就拦住炸弹的时机。 */
+    var zmeta = zip.files[full];
+    var declared = zmeta && zmeta._data && zmeta._data.uncompressedSize;
+    if(typeof declared === 'number' && declared > MAX_EPUB_ENTRY){ failed++; continue; }
+
+    /* zip bomb 防护之三：累计解压量 */
+    if(epubUncompressed > MAX_EPUB_TOTAL){
+      throw new Error('EPUB 解压总量超过 ' + fmtMB(MAX_EPUB_TOTAL) + ' 上限（疑似 zip bomb）');
+    }
+
     var bytes = await f.async('uint8array');
+    epubUncompressed += bytes.length;
+    if(epubUncompressed > MAX_EPUB_TOTAL){
+      throw new Error('EPUB 解压总量超过 ' + fmtMB(MAX_EPUB_TOTAL) + ' 上限（疑似 zip bomb）');
+    }
     var dec = decodeBytes(bytes);
     encSet[dec.enc] = 1;
     if(garbledRatio(dec.text) > 0.005) garbled = true;
@@ -3187,7 +3230,13 @@ var textInput = document.getElementById('textInput');
 var textMeta  = document.getElementById('textMeta');
 
 function applyText(txt){
-  state.text = txt || '';
+  var t = txt || '';
+  /* 内存保护：解码/清洗后仍可能很长（HTML 里塞满实体等），这里再兜一道 */
+  if(t.length > MAX_TEXT_CHARS){
+    t = t.slice(0, MAX_TEXT_CHARS);
+    toast('文本过长，已截断到 ' + (MAX_TEXT_CHARS / 1e4) + ' 万字');
+  }
+  state.text = t;
   state.textVer++;
   state.streamKey = '';
   state.wordsKey = '';
@@ -3269,6 +3318,8 @@ function reportTextResult(info, prefix){
 
 function handleTextFile(file){
   if(!file) return;
+
+  if(file.size > MAX_TEXT_BYTES){ tooBig('文本文件', file.size, MAX_TEXT_BYTES); return; }
 
   var name = file.name || '';
   var isEpub = /\.epub$/i.test(name) || file.type === 'application/epub+zip';
@@ -3366,12 +3417,23 @@ function applyImage(file){
     toast('这不是可识别的图片格式');
     return;
   }
+  if(file.size > MAX_IMAGE_BYTES){ tooBig('图片文件', file.size, MAX_IMAGE_BYTES); return; }
 
   setBusy('载入图像…');
   var fr = new FileReader();
   fr.onload = function(e){
     var img = new Image();
     img.onload = function(){
+      /* 解压炸弹防护：小文件可以解出巨幅位图，解码后再拦一次像素总量 */
+      var px = img.naturalWidth * img.naturalHeight;
+      if(!px || px > MAX_IMG_PIXELS){
+        setBusy('');
+        imgMeta.textContent = '图片分辨率过大';
+        imgMeta.className = 'meta warn';
+        toast('图片 ' + img.naturalWidth + '×' + img.naturalHeight +
+              ' 过大（上限 ' + (MAX_IMG_PIXELS / 1e4) + ' 万像素）');
+        return;
+      }
       setBusy('');
       state.img = img;
       state.imgId++;

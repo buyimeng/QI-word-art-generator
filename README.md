@@ -61,7 +61,11 @@
 
 - **零外部依赖** —— 唯一用到的 JSZip 3.10.1 已内联进 HTML（附官方 sha512 校验值），
   整个文件**不发起任何网络请求**
-- **严格 CSP** —— `connect-src 'none'` 等 14 条指令，从浏览器层面堵死数据外传
+- **CSP 哈希白名单** —— 没有 `'unsafe-inline'`，`script-src` / `style-src` 只认本文件那两段
+  内联脚本和那一段样式的 sha256。**任何后来被塞进文件的脚本都不会执行。**
+  另有 `connect-src 'none'` 等 14 条指令，从浏览器层面堵死数据外传
+- **输入大小上限** —— TXT/HTML/EPUB 24 MB、图片 32 MB、图片 4000 万像素，
+  EPUB 还有解压炸弹防护（单条目 8 MB / 累计 96 MB / 条目数 5000）
 - **输出转义** —— 唯一一处 `innerHTML` 已用 `escHtml()` 处理，
   载入的小说里就算藏了 `<img onerror=...>` 也只会被当普通文字显示
 - 不存在 `fetch` / `XMLHttpRequest` / `WebSocket` / `eval` / `localStorage` / `document.cookie`
@@ -72,11 +76,15 @@
 当前版本指纹：
 
 ```
-大小   : 233440 字节
-sha256 : 586741c61b419ae457c626f21e1a297dc2bf210b764fcfbd1fb08363a4b31f34
+大小   : 236895 字节
+sha256 : 555df944dc0740dd80b48a4cd10b85fa493c8e2aa19b97d36bc75a347be89ec2
 ```
 
-详细的威胁模型、验证方法和**账号加固清单**见 [SECURITY.md](SECURITY.md)。
+> **改代码的人注意**：CSP 哈希是对脚本正文逐字节计算的，**改一个空格都会失配、页面会白屏**。
+> 改完 `index.html` 后必须跑 `node tools/csp-hash.mjs index.html` 重新签名。
+> 仓库里加了 `.gitattributes`（`* -text`）禁止行尾转换，否则 Windows 上 clone 下来哈希就会错。
+
+详细的威胁模型、五种自查方法和**账号加固清单**见 [SECURITY.md](SECURITY.md)。
 
 ---
 

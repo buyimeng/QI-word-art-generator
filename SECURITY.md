@@ -41,25 +41,73 @@ sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL
 
 该哈希与 cdnjs 官方发布的 SRI 值逐字符一致。**内联之后，这个文件不再发起任何网络请求。**
 
-### 2. 内容安全策略（CSP）
+### 2. 内容安全策略（CSP）—— 用哈希白名单锁死脚本
 
-`<head>` 里加了严格的 CSP，其中关键几条：
+`<head>` 里有一条严格的 CSP，**不含 `'unsafe-inline'`**：
 
 | 指令 | 作用 |
 | --- | --- |
 | `default-src 'none'` | 默认拒绝一切 |
+| `script-src 'sha256-…' 'sha256-…'` | **只允许本文件里那两段内联脚本执行**，其余一律拒绝 |
+| `style-src 'sha256-…'` | 同上，只允许那一段内联样式表 |
 | `connect-src 'none'` | **禁止 fetch / XHR / WebSocket / sendBeacon，堵死数据外传** |
 | `object-src 'none'` | 禁止插件 |
 | `frame-src 'none'` / `child-src 'none'` | 禁止内嵌框架 |
+| `worker-src 'none'` / `manifest-src 'none'` | 禁止 Worker 与 PWA 清单 |
+| `font-src 'none'` / `media-src 'none'` | 禁止外部字体与音视频 |
 | `base-uri 'none'` | 禁止改写相对地址基准 |
 | `form-action 'none'` | 禁止表单提交 |
 | `img-src data: blob:` | 只允许本地图片 |
+
+**为什么用哈希而不是 `'unsafe-inline'`：** 这个文件里没有任何内联事件处理器（`onclick=` 之类）
+和 `javascript:` 链接，所以可以给每一段内联脚本算出 sha256 写进白名单。这样一来，
+**任何后来被塞进文件的脚本都不会执行**——它的哈希不在名单里。
+（实测：往文件里插入一段 `<script>window.__EVIL_RAN=true</script>`，CSP 直接拦下，变量始终为
+`undefined`。）
+
+> ⚠️ **维护提醒**：哈希是对脚本正文逐字节计算的，**改一个空格都会失配、页面会白屏**。
+> 改完 `index.html` 后必须跑一次：
+> ```bash
+> node tools/csp-hash.mjs index.html
+> ```
+> 它会重新计算哈希并写回 CSP。仓库里已附带这个脚本。
 
 ### 3. 输出转义
 
 工具里唯一一处 `innerHTML`（高频词筛选结果的按钮）已经过 `escHtml()` 转义，覆盖
 `& < > " '`。也就是说，**即使你载入的小说里被人塞了 `<img onerror=...>` 这类内容，它也只会被当作
 普通文字显示，不会变成可执行代码**。其余所有文本输出都走 `textContent`。
+
+### 4. 输入大小上限（防 DoS / 解压炸弹）
+
+工具要解析你给的文件，所以「文件本身」是一个攻击面——一个精心构造的文件可以让浏览器吃光内存。
+现在所有入口都有硬上限：
+
+| 入口 | 上限 |
+| --- | --- |
+| TXT / HTML / EPUB 文件大小 | 24 MB |
+| 图片文件大小 | 32 MB |
+| 清洗后的文本长度 | 1200 万字符 |
+| 图片解码后的像素总量 | 4000 万像素 |
+| EPUB 单条目解压后大小 | 8 MB |
+| EPUB 全部条目解压累计 | 96 MB |
+| EPUB 条目数 | 5000 |
+
+其中 EPUB 的三条是**解压炸弹（zip bomb）防护**：一个 10 KB 的 EPUB 可以解压出 9 MB 正文，
+再大一点就能把内存打满。现在会在解压**之前**先读 ZIP 头里声明的大小，超限直接跳过；
+解压过程中再累计一次实际字节数。
+
+### 5. `.gitattributes` 禁止行尾转换
+
+CSP 用哈希锁脚本，意味着**文件字节必须完全一致**。而 Windows 上 git 默认
+`core.autocrlf=true`，检出时会把 LF 换成 CRLF——哈希立刻失配、页面白屏。
+所以仓库里加了 `.gitattributes`：
+
+```
+* -text
+```
+
+禁止一切行尾转换，保证任何人 clone 下来的字节和仓库里的字节相同。
 
 ---
 
@@ -84,8 +132,8 @@ sha256sum index.html
 本仓库当前版本的 `index.html`：
 
 ```
-大小   : 233440 字节
-sha256 : 586741c61b419ae457c626f21e1a297dc2bf210b764fcfbd1fb08363a4b31f34
+大小   : 236895 字节
+sha256 : 555df944dc0740dd80b48a4cd10b85fa493c8e2aa19b97d36bc75a347be89ec2
 ```
 
 > 注意：指纹只能帮你发现「文件被改动过」。如果攻击者同时改了文件和这里记录的哈希，指纹就失去意义了
@@ -99,15 +147,42 @@ grep -nE 'fetch\(|XMLHttpRequest|WebSocket|eval\(|new Function|localStorage|inne
 
 `innerHTML` 只应出现在高频词渲染那一处，且被 `escHtml()` 包着。
 
+### 方法四：核对 CSP 哈希（最严格）
+
+CSP 白名单里的哈希必须和文件里实际那段脚本对得上。自己算一遍：
+
+```bash
+node tools/csp-hash.mjs index.html
+```
+
+输出里的三个哈希应与文件第 5 行 CSP 里的值**完全一致**，并且末尾显示「CSP 内容无变化」。
+如果不一致，说明脚本正文被改动过（或有人忘了重签）。
+
+### 方法五：看 CSP 有没有真的生效
+
+用浏览器打开页面 → `F12` → Console（控制台）。粘贴：
+
+```js
+fetch('https://example.com/probe').then(()=>console.log('ALLOWED!!')).catch(()=>console.log('BLOCKED'))
+```
+
+应该打印 **`BLOCKED`**——这是浏览器在替你强制「不联网」，不是靠代码自觉。
+
 ---
 
 ## 说清楚：CSP 挡得住什么、挡不住什么
 
-**挡得住**：第三方依赖被投毒、你载入的小说/EPUB 里藏了恶意内容。
-即使这两者出问题，页面也无法把任何数据发出去。
+**挡得住**
+- 第三方依赖被投毒（现在已无第三方依赖）
+- 你载入的小说 / EPUB / TXT / 图片里藏了恶意内容
+- **文件被「部分」篡改**——比如有人往脚本块里插一段新代码。
+  哈希白名单会让它无法执行（这是哈希型 CSP 相比 `'unsafe-inline'` 多出来的那层保护）
+- 页面把任何数据发出去（`connect-src 'none'`）
 
-**挡不住**：**有人拿到仓库写权限、直接替换掉整个文件**——包括替换掉 CSP 本身。
-CSP 是文件自己声明的，能改文件的人自然也能删掉它。
+**挡不住**
+- **有人拿到仓库写权限、直接替换掉整个文件**——包括替换掉 CSP 本身。
+  CSP 是文件自己声明的，能改文件的人自然也能删掉它。
+- 有人下载了旧版本或被改过的版本**存到本地**再用。CSP 只管运行期，管不了文件来源。
 
 所以真正防「账号被劫持」的，不是这份文件，而是下面的账号措施。
 
@@ -136,13 +211,21 @@ CSP 是文件自己声明的，能改文件的人自然也能删掉它。
 
 ## 账号加固清单
 
-按收益从高到低排：
+按收益从高到低排。
+
+### 已完成
+
+- ✅ **Passkey**（比短信 2FA 强得多，且抗钓鱼）
+- ✅ **Vigilant mode**（`https://github.com/settings/security` → *Vigilant mode*）
+  开启后，任何**未签名**的提交都会显示 `Unverified` 黄标。这样一旦有人用别的方式往仓库推东西，
+  你一眼就能看出来。**副作用**：本仓库现有的两个提交是未签名的，会显示黄标——这是正常的，
+  解决办法见下面第 7 条。
+- ✅ 只保留了确实需要的授权（`Git Credential Manager`、`GitHub Android`）
 
 ### 必做
 
-1. **开启 2FA**（你看起来已经开了，之前出现过 sudo 模式验证）
+1. **开启 2FA**（已完成，用 Passkey）
    https://github.com/settings/security
-   推荐用 **Passkey** 或 **认证器 App**；短信是最弱的一档。
 
 2. **检查已授权的第三方应用**，撤销不认识的
    - OAuth Apps：https://github.com/settings/applications
@@ -168,17 +251,39 @@ CSP 是文件自己声明的，能改文件的人自然也能删掉它。
    - `Dependabot alerts` / `Dependabot security updates`
    - `Secret scanning` + `Push protection`（防止误传密钥）
 
-7. **设置 Commit 邮箱隐私**
+7. **配置提交签名**，让 Vigilant mode 下的黄标变成绿色的 `Verified`
+   推荐用 SSH 签名（不需要装 GPG）：
+
+   ```bash
+   # 1. 生成一把专用签名密钥（不要设密码短语，否则每次提交都要输）
+   ssh-keygen -t ed25519 -C "signing" -f ~/.ssh/id_ed25519_signing -N ""
+
+   # 2. 把公钥加到 GitHub，类型选 Authentication Key 之外要再传一次并选 Signing Key
+   #    https://github.com/settings/ssh/new  →  Key type 选 "Signing Key"
+
+   # 3. 告诉 git 用它签名
+   git config --global gpg.format ssh
+   git config --global user.signingkey ~/.ssh/id_ed25519_signing.pub
+   git config --global commit.gpgsign true
+   ```
+
+   配置好之后新提交会显示绿色 `Verified`。**已有的两个提交仍然是黄标**（签名不能追溯补），
+   但之后不会再有。
+
+8. **设置 Commit 邮箱隐私**
    https://github.com/settings/emails → 勾选 `Keep my email addresses private`
    本仓库的提交用的是 `184805341+buyimeng@users.noreply.github.com`，不含真实邮箱。
 
 ### 不要做
 
-8. **不要在这个仓库加 GitHub Actions workflow。** 一个静态页面不需要 CI，
+9. **不要在这个仓库加 GitHub Actions workflow。** 一个静态页面不需要 CI，
    而 workflow 拥有仓库写权限和 Secrets 访问权，是远比页面危险的东西。
 
-9. **不要把 Token 提交进来。** 任何 PAT、密钥、密码都不要写进仓库。
-   如果误传了，**改密码 / 撤销 Token 是不够的**——Git 历史里还在，必须撤销凭证并重写历史。
+10. **不要把 Token 提交进来。** 任何 PAT、密钥、密码都不要写进仓库。
+    如果误传了，**改密码 / 撤销 Token 是不够的**——Git 历史里还在，必须撤销凭证并重写历史。
+
+11. **不要为了「方便」关掉 Vigilant mode。** 黄标看着难受，但它是你唯一的「有人动了我的仓库」告警。
+    正解是配签名（第 7 条），不是关告警。
 
 ---
 

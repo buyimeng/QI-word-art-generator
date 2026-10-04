@@ -1,0 +1,5 @@
+# index.html 用 sha256 哈希锁定内联脚本与样式的 CSP 白名单。
+# 换行符一旦被 git 转换（Windows 上 core.autocrlf=true 会把 LF 变 CRLF），
+# 哈希立刻失配，浏览器拒绝执行内联脚本 → 页面白屏。
+# 所以本仓库禁用一切行尾转换，保证检出字节与提交字节完全一致。
+* -text
