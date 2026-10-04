@@ -1,0 +1,3867 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>QI文字成画</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+
+  :root{
+    --tx1:#2C2C2E;
+    --tx2:rgba(44,44,46,.62);
+    --tx3:rgba(44,44,46,.28);
+    --panel:rgba(248,249,250,.96);
+    --accent:#5E9FC6;
+    --accent-deep:#3D7EA3;
+    --accent-soft:rgba(111,175,212,.10);
+    --line:rgba(0,0,0,.10);
+    --ui-font:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+
+  html,body{
+    width:100%;height:100%;
+    overflow:hidden;
+    background:#F5F5F7;
+    font-family:var(--ui-font);
+    -webkit-font-smoothing:antialiased;
+    color:var(--tx1);
+    -webkit-text-size-adjust:100%;
+  }
+
+  /* ============ 布局 ============ */
+  #app{display:flex;width:100%;height:100%;}
+
+  /* ---------- 左侧控制面板 ---------- */
+  #panel{
+    flex:0 0 318px;
+    width:318px;
+    height:100%;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:26px 20px 64px;
+    background:var(--panel);
+    -webkit-backdrop-filter:blur(12px) saturate(1.2);
+    backdrop-filter:blur(12px) saturate(1.2);
+    border-right:1px solid rgba(0,0,0,.07);
+    scrollbar-width:thin;
+    scrollbar-color:rgba(0,0,0,.18) transparent;
+  }
+  #panel::-webkit-scrollbar{width:6px;}
+  #panel::-webkit-scrollbar-thumb{background:rgba(0,0,0,.16);border-radius:3px;}
+  #panel::-webkit-scrollbar-track{background:transparent;}
+
+  #panel h1{
+    font-size:18px;
+    font-weight:600;
+    letter-spacing:.16em;
+    color:var(--tx1);
+    margin-bottom:6px;
+  }
+  #panel .sub{
+    font-size:11px;
+    letter-spacing:.18em;
+    color:var(--tx2);
+    margin-bottom:26px;
+  }
+
+  section{margin-bottom:24px;}
+
+  section h2{
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:.08em;
+    color:var(--tx1);
+    margin-bottom:11px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  section h2 .num{
+    display:inline-flex;
+    align-items:center;justify-content:center;
+    width:17px;height:17px;
+    border-radius:50%;
+    background:rgba(111,175,212,.22);
+    color:var(--accent-deep);
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0;
+    flex:0 0 auto;
+  }
+
+  /* ---------- 拖放区 ---------- */
+  .drop{
+    position:relative;
+    border:1px dashed rgba(0,0,0,.22);
+    border-radius:8px;
+    padding:17px 12px;
+    text-align:center;
+    font-size:13px;
+    letter-spacing:.04em;
+    color:var(--tx2);
+    cursor:pointer;
+    background:rgba(255,255,255,.55);
+    transition:border-color .2s ease, background .2s ease, color .2s ease;
+  }
+  .drop:hover{
+    border-color:#5E9FC6;
+    color:var(--accent-deep);
+    background:rgba(111,175,212,.10);
+  }
+  .drop.over{
+    border-color:#5E9FC6;
+    background:rgba(111,175,212,.16);
+    color:var(--accent-deep);
+  }
+  .drop .ic{
+    display:block;
+    font-size:18px;
+    line-height:1;
+    margin-bottom:7px;
+    color:var(--accent-deep);
+    opacity:.75;
+    letter-spacing:0;
+  }
+  .drop .fmt{
+    display:block;
+    font-size:11px;
+    letter-spacing:.04em;
+    color:var(--tx3);
+    margin-top:7px;
+  }
+
+  .meta{
+    font-size:11px;
+    letter-spacing:.02em;
+    color:var(--tx2);
+    margin-top:8px;
+    padding-left:2px;
+    line-height:1.5;
+  }
+  .meta.ok{color:var(--accent-deep);}
+  .meta.warn{color:#B4702A;}
+
+  /* ---------- 文本输入 ---------- */
+  textarea{
+    width:100%;
+    height:84px;
+    margin-top:10px;
+    padding:10px 11px;
+    font-family:var(--ui-font);
+    font-size:13px;
+    line-height:1.7;
+    letter-spacing:.02em;
+    color:var(--tx1);
+    background:rgba(255,255,255,.82);
+    border:1px solid rgba(0,0,0,.12);
+    border-radius:8px;
+    resize:vertical;
+    outline:none;
+    transition:border-color .2s ease, box-shadow .2s ease;
+  }
+  textarea::placeholder{color:var(--tx3);}
+  textarea:focus{
+    border-color:rgba(111,175,212,.9);
+    box-shadow:0 0 0 3px rgba(111,175,212,.16);
+  }
+
+  /* ---------- 滑块 ---------- */
+  .ctrl{margin-bottom:16px;}
+
+  .ctrl .lbl{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-size:12.5px;
+    font-weight:500;
+    letter-spacing:.02em;
+    color:var(--tx1);
+    margin-bottom:8px;
+  }
+  .ctrl .lbl .val{
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:0;
+    color:var(--accent-deep);
+    font-variant-numeric:tabular-nums;
+  }
+
+  input[type=range]{
+    -webkit-appearance:none;
+    appearance:none;
+    display:block;
+    width:100%;
+    height:4px;
+    margin:6px 0 2px;
+    border-radius:2px;
+    background:rgba(0,0,0,.14);
+    outline:none;
+    cursor:pointer;
+    touch-action:pan-y;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    appearance:none;
+    width:16px;height:16px;
+    border-radius:50%;
+    background:#fff;
+    border:2px solid var(--accent);
+    box-shadow:0 1px 5px rgba(111,175,212,.45);
+    transition:transform .16s ease;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.12);}
+  input[type=range]::-moz-range-thumb{
+    width:16px;height:16px;
+    border-radius:50%;
+    background:#fff;
+    border:2px solid var(--accent);
+    box-shadow:0 1px 5px rgba(111,175,212,.45);
+    cursor:pointer;
+  }
+
+  /* ---------- 分段控件 ---------- */
+  .seg{
+    display:flex;
+    background:rgba(0,0,0,.06);
+    border-radius:8px;
+    padding:3px;
+    gap:3px;
+  }
+  .seg button{
+    flex:1;
+    min-height:38px;
+    border:none;
+    background:transparent;
+    font-family:inherit;
+    font-size:12.5px;
+    font-weight:500;
+    letter-spacing:.02em;
+    color:var(--tx2);
+    padding:8px 6px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .18s ease, color .18s ease, box-shadow .18s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .seg button:hover{color:var(--tx1);}
+  .seg button.on{
+    background:#FFFFFF;
+    color:var(--accent-deep);
+    font-weight:600;
+    box-shadow:0 1px 2px rgba(0,0,0,.10), 0 2px 8px rgba(0,0,0,.08);
+  }
+  /* 四项时排成 2×2，避免「乱序 · 句」被挤断行 */
+  .seg.two{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+  .hide{display:none !important;}
+
+  /* ---------- 高频词预览（可点选排除） ---------- */
+  .freqBox{
+    margin-top:10px;
+    padding:9px 9px 8px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    background:rgba(0,0,0,.022);
+  }
+  .fpHead{
+    font-size:11px;
+    line-height:1.5;
+    color:var(--tx2);
+    letter-spacing:.03em;
+    margin-bottom:7px;
+  }
+  .fpHead b{color:var(--accent-deep);font-weight:700;}
+  .fpChips{
+    display:flex;
+    flex-wrap:wrap;
+    gap:5px;
+    max-height:140px;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+  }
+  .fpChips::-webkit-scrollbar{width:5px;}
+  .fpChips::-webkit-scrollbar-thumb{background:var(--tx3);border-radius:3px;}
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    padding:4px 7px;
+    border:1px solid rgba(111,175,212,.42);
+    border-radius:999px;
+    background:var(--accent-soft);
+    color:var(--tx1);
+    font-family:var(--ui-font);
+    font-size:11.5px;
+    line-height:1;
+    cursor:pointer;
+    transition:background .15s ease, border-color .15s ease, color .15s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .chip:hover{background:rgba(111,175,212,.24);border-color:var(--accent);}
+  .chip i{font-style:normal;font-size:9.5px;color:var(--tx2);}
+  .chip.off{
+    background:transparent;
+    border-style:dashed;
+    border-color:var(--tx3);
+    color:var(--tx3);
+    text-decoration:line-through;
+  }
+  .chip.off i{text-decoration:none;}
+
+  /* ---------- 渲染模式网格 ---------- */
+  .modeGrid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .modeGrid button{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:1px;
+    padding:10px 10px 9px;
+    border:1.5px solid transparent;
+    border-radius:9px;
+    background:rgba(0,0,0,.045);
+    font-family:inherit;
+    text-align:left;
+    color:#8A9199;
+    cursor:pointer;
+    transition:background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .16s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .modeGrid button:hover{background:rgba(0,0,0,.075);}
+  .modeGrid button:active{transform:scale(.98);}
+  .modeGrid button.on{
+    background:#FFFFFF;
+    border-color:var(--accent);
+    color:var(--accent-deep);
+    box-shadow:0 2px 8px rgba(0,0,0,.10), 0 0 0 3px rgba(111,175,212,.14);
+  }
+  .modeGrid .mi{display:block;line-height:0;margin-bottom:5px;}
+  .modeGrid .mi svg{display:block;width:22px;height:22px;}
+  .modeGrid .mn{
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:.02em;
+    color:var(--tx2);
+  }
+  .modeGrid button.on .mn{color:var(--accent-deep);}
+  .modeGrid .md{
+    font-size:11px;
+    line-height:1.35;
+    color:var(--tx3);
+  }
+  .modeGrid button.on .md{color:rgba(44,44,46,.55);}
+
+  /* ---------- 模式附加选项 ---------- */
+  .subOpts{
+    margin-top:12px;
+    padding:12px 12px 2px;
+    border-radius:9px;
+    background:rgba(111,175,212,.07);
+    border:1px solid rgba(111,175,212,.20);
+  }
+  .subOpts.hide{display:none;}
+  .subOpts .ctrl:last-of-type{margin-bottom:10px;}
+  .subOpts .note{
+    font-size:11px;
+    line-height:1.5;
+    color:var(--tx2);
+    padding-bottom:12px;
+  }
+
+  /* ---------- 换一批 ---------- */
+  .miniBtn{
+    display:block;
+    width:100%;
+    margin-top:8px;
+    padding:9px 10px;
+    border:1px dashed rgba(111,175,212,.55);
+    border-radius:8px;
+    background:rgba(111,175,212,.08);
+    color:var(--accent-deep);
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.06em;
+    cursor:pointer;
+    transition:background .18s ease, border-color .18s ease, transform .16s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .miniBtn:hover{background:rgba(111,175,212,.16);border-color:var(--accent);}
+  .miniBtn:active{transform:scale(.985);}
+
+  /* ---------- 说明 / 图例 ---------- */
+  .hint{
+    margin-top:9px;
+    padding-left:2px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .hint .row{
+    position:relative;
+    font-size:11px;
+    line-height:1.55;
+    color:var(--tx2);
+    padding-left:13px;
+    transition:color .2s ease;
+  }
+  .hint .row::before{
+    content:"";
+    position:absolute;
+    left:2px;top:7px;
+    width:4px;height:4px;
+    border-radius:50%;
+    background:var(--tx3);
+    transition:background .2s ease;
+  }
+  .hint .row.on{color:var(--accent-deep);font-weight:600;}
+  .hint .row.on::before{background:var(--accent);}
+  .hint .row b{font-weight:600;}
+
+  /* ---------- 颜色 ---------- */
+  .colorRow{display:flex;align-items:center;gap:10px;}
+  .colorRow input[type=color]{
+    -webkit-appearance:none;
+    appearance:none;
+    width:40px;height:30px;
+    padding:0;
+    border:1px solid rgba(0,0,0,.14);
+    border-radius:7px;
+    background:transparent;
+    cursor:pointer;
+  }
+  .colorRow input[type=color]::-webkit-color-swatch-wrapper{padding:3px;}
+  .colorRow input[type=color]::-webkit-color-swatch{border:none;border-radius:4px;}
+  .colorRow .cl{font-size:12.5px;color:var(--tx2);}
+
+  /* ---------- 按钮 ---------- */
+  .btns{display:flex;flex-wrap:wrap;gap:9px;margin-top:4px;}
+  .btns .btn{flex:1 1 calc(50% - 5px);}
+  .btns .btn.wide{flex:1 1 100%;}
+  .btn{
+    border:none;
+    border-radius:8px;
+    padding:12px 10px;
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.08em;
+    cursor:pointer;
+    transition:background .2s ease, transform .16s ease, box-shadow .2s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn:active{transform:scale(.975);}
+  .btn.primary{
+    background:var(--accent);
+    color:#fff;
+    box-shadow:0 2px 10px rgba(111,175,212,.42);
+  }
+  .btn.primary:hover{background:#4E90B8;}
+  .btn.ghost{
+    background:rgba(0,0,0,.06);
+    color:var(--tx1);
+  }
+  .btn.ghost:hover{background:rgba(0,0,0,.10);}
+  .btn:disabled{opacity:.42;cursor:not-allowed;transform:none!important;}
+
+  /* ---------- 画布区 ---------- */
+  #stage{flex:1;position:relative;overflow:hidden;min-width:0;}
+  #canvasBox{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:34px;
+  }
+  canvas#view{
+    display:block;
+    background:#fff;
+    border-radius:3px;
+    box-shadow:
+      0 12px 48px rgba(0,0,0,.12),
+      0 2px 8px rgba(0,0,0,.06);
+    max-width:100%;
+    max-height:100%;
+  }
+
+  /* ---------- 渲染中（仅动画 opacity，走合成层） ---------- */
+  #busy{
+    position:absolute;
+    top:16px;right:18px;
+    font-size:11.5px;
+    letter-spacing:.08em;
+    color:var(--tx2);
+    opacity:0;
+    transition:opacity .2s ease;
+    pointer-events:none;
+    z-index:5;
+    background:rgba(255,255,255,.92);
+    padding:6px 14px;
+    border-radius:20px;
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+    will-change:opacity;
+  }
+  #busy.on{opacity:1;}
+
+  /* ---------- 空状态 ---------- */
+  .empty{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:13px;
+    pointer-events:none;
+  }
+  .empty .big{
+    font-size:14px;
+    letter-spacing:.3em;
+    color:rgba(44,44,46,.30);
+  }
+  .empty .small{
+    font-size:11px;
+    letter-spacing:.14em;
+    color:rgba(44,44,46,.24);
+  }
+
+  /* ---------- Toast（只动 opacity + transform） ---------- */
+  #toast{
+    position:fixed;
+    left:50%;bottom:32px;
+    transform:translateX(-50%) translateY(12px);
+    background:rgba(44,44,46,.92);
+    color:#fff;
+    font-size:12.5px;
+    letter-spacing:.02em;
+    line-height:1.5;
+    padding:10px 20px;
+    border-radius:22px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .26s ease, transform .26s ease;
+    z-index:999;
+    max-width:82vw;
+    text-align:center;
+    box-shadow:0 8px 28px rgba(0,0,0,.22);
+    will-change:opacity, transform;
+  }
+  #toast.on{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ---------- 使用说明弹窗（只动 opacity / visibility / transform） ---------- */
+  #intro{
+    position:fixed;
+    inset:0;
+    z-index:1000;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:rgba(24,26,30,.34);
+    -webkit-backdrop-filter:blur(6px) saturate(1.1);
+    backdrop-filter:blur(6px) saturate(1.1);
+    opacity:0;
+    visibility:hidden;
+    transition:opacity .28s ease, visibility .28s;
+  }
+  #intro.on{opacity:1;visibility:visible;}
+
+  #intro .card{
+    width:100%;
+    max-width:396px;
+    background:#fff;
+    border-radius:18px;
+    padding:26px 26px 22px;
+    box-shadow:0 24px 64px rgba(0,0,0,.26);
+    transform:translateY(14px) scale(.986);
+    transition:transform .32s cubic-bezier(.22,.9,.3,1);
+  }
+  #intro.on .card{transform:none;}
+
+  #intro .it{
+    font-size:14.5px;
+    font-weight:600;
+    letter-spacing:.16em;
+    color:var(--tx1);
+    padding-left:11px;
+    position:relative;
+    margin-bottom:15px;
+  }
+  #intro .it::before{
+    content:"";
+    position:absolute;
+    left:0;top:50%;
+    width:3px;height:13px;
+    margin-top:-6.5px;
+    border-radius:2px;
+    background:var(--accent);
+  }
+  #intro p{
+    font-size:13px;
+    line-height:1.9;
+    letter-spacing:.01em;
+    color:var(--tx2);
+  }
+  #intro p + p{margin-top:9px;}
+  #intro p b{color:var(--accent-deep);font-weight:600;}
+  #intro p.dis{
+    margin-top:14px;
+    padding-top:12px;
+    border-top:1px solid rgba(0,0,0,.07);
+    font-size:10.5px;
+    line-height:1.78;
+    color:rgba(44,44,46,.44);
+    letter-spacing:0;
+  }
+  #intro p.dis b{color:rgba(44,44,46,.62);}
+
+  #intro .ok{
+    display:block;
+    width:100%;
+    margin-top:21px;
+    padding:12px 10px;
+    border:none;
+    border-radius:11px;
+    background:var(--accent);
+    color:#fff;
+    font-family:inherit;
+    font-size:13.5px;
+    font-weight:600;
+    letter-spacing:.14em;
+    cursor:pointer;
+    transition:background .18s ease;
+  }
+  #intro .ok:hover{background:var(--accent-deep);}
+  #intro .ok:active{transform:translateY(1px);}
+
+  /* ---------- 移动端：字号不缩小，保证可点按 ---------- */
+  @media (max-width:780px){
+    #app{flex-direction:column;}
+    #panel{
+      flex:0 0 auto;
+      width:100%;
+      height:auto;
+      max-height:50vh;
+      border-right:none;
+      border-bottom:1px solid rgba(0,0,0,.07);
+      padding:20px 16px 30px;
+    }
+    #canvasBox{padding:16px;}
+    .seg button{min-height:42px;}
+    .modeGrid button{padding:11px 10px 10px;}
+    .btn{padding:13px 10px;}
+    .drop{padding:18px 12px;}
+    #intro{padding:16px;}
+    #intro .card{padding:22px 20px 18px;border-radius:16px;}
+    #intro .ok{min-height:46px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ 控制面板 ============ -->
+  <aside id="panel">
+
+    <h1>QI文字成画</h1>
+    <div class="sub">TEXT · IMAGE · DENSITY</div>
+
+    <!-- 1. 文本 -->
+    <section>
+      <h2><span class="num">1</span>载入小说文本</h2>
+      <div class="drop" id="dropText">
+        <span class="ic">⌘</span>
+        拖入 EPUB ／ TXT ／ 点击选择
+        <span class="fmt">支持 .epub .txt .html（UTF-8 / UTF-16 / Shift_JIS / EUC-JP）</span>
+        <input type="file" id="fileText" accept=".txt,.epub,.xhtml,.html,text/plain,application/epub+zip" hidden>
+      </div>
+      <textarea id="textInput" placeholder="或直接粘贴日文小说文本…"></textarea>
+      <div class="meta" id="textMeta">0 字</div>
+    </section>
+
+    <!-- 2. 图像 -->
+    <section>
+      <h2><span class="num">2</span>载入参考图像</h2>
+      <div class="drop" id="dropImg">
+        <span class="ic">◫</span>
+        拖入图片 ／ 点击选择
+        <span class="fmt">PNG · JPG · WEBP · GIF（取首帧）</span>
+        <input type="file" id="fileImg" accept="image/*" hidden>
+      </div>
+      <div class="meta" id="imgMeta">未载入</div>
+    </section>
+
+    <!-- 3. 渲染模式 -->
+    <section>
+      <h2><span class="num">3</span>渲染模式</h2>
+
+      <div class="modeGrid" id="modeGrid">
+        <button type="button" data-mode="yang" class="on">
+          <span class="mi">
+            <svg viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="8" fill="currentColor"/></svg>
+          </span>
+          <span class="mn">阳刻</span>
+          <span class="md">浓墨落暗部，字为实</span>
+        </button>
+        <button type="button" data-mode="yin">
+          <span class="mi">
+            <svg viewBox="0 0 22 22" aria-hidden="true">
+              <circle cx="11" cy="11" r="7.4" fill="none" stroke="currentColor" stroke-width="2.4"/>
+              <circle cx="11" cy="11" r="2.1" fill="currentColor"/>
+            </svg>
+          </span>
+          <span class="mn">阴刻</span>
+          <span class="md">浓墨落亮部，字为虚</span>
+        </button>
+        <button type="button" data-mode="texture">
+          <span class="mi">
+            <svg viewBox="0 0 22 22" aria-hidden="true">
+              <rect x="2" y="4.6" width="18" height="2.6" rx="1.3" fill="currentColor" opacity=".55"/>
+              <rect x="2" y="9.7" width="18" height="2.6" rx="1.3" fill="currentColor" opacity=".55"/>
+              <rect x="2" y="14.8" width="12" height="2.6" rx="1.3" fill="currentColor" opacity=".55"/>
+              <circle cx="14.4" cy="16.1" r="3.6" fill="currentColor"/>
+            </svg>
+          </span>
+          <span class="mn">文字底纹</span>
+          <span class="md">文字作纸底，主体抠图叠加</span>
+        </button>
+        <button type="button" data-mode="fill">
+          <span class="mi">
+            <svg viewBox="0 0 22 22" aria-hidden="true">
+              <path d="M11 2.6c3.6 0 6.4 2.6 6.4 6.2 0 2.4-1.2 3.7-1.2 5.4 0 2 1.6 2.7 1.6 4.2 0 1.1-1 2-2.4 2H6.6c-1.4 0-2.4-.9-2.4-2 0-1.5 1.6-2.2 1.6-4.2 0-1.7-1.2-3-1.2-5.4 0-3.6 2.8-6.2 6.4-6.2z"
+                    fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="1.4 1.9" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="mn">文字填充</span>
+          <span class="md">词云填满主体轮廓</span>
+        </button>
+      </div>
+
+      <!-- 仅「文字底纹」「文字填充」使用 -->
+      <div class="subOpts hide" id="subOpts">
+        <div class="ctrl">
+          <div class="lbl">取词来源</div>
+          <div class="seg" id="segDialogue">
+            <button type="button" data-dlg="no" class="on">全部文字</button>
+            <button type="button" data-dlg="yes">仅取台词</button>
+          </div>
+          <div class="hint">
+            <div class="row">仅取台词 · 只保留「」『』“” 里的对白，以及「：」之后的内容</div>
+            <div class="row" id="dlgHint">当前：全部文字</div>
+          </div>
+        </div>
+        <div class="ctrl" id="wrapColorVar">
+          <div class="lbl">彩色变化<span class="val" id="vColorVar">0.45</span></div>
+          <input type="range" id="rColorVar" min="0" max="1" value="0.45" step="0.01">
+          <div class="hint">
+            <div class="row">只影响「文字填充」· 大词更容易上色，拉到 0 就是单色</div>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="lbl">主体识别阈值<span class="val" id="vFgThr">0.45</span></div>
+          <input type="range" id="rFgThr" min="0.05" max="0.95" value="0.45" step="0.01">
+        </div>
+        <div class="ctrl">
+          <div class="lbl">边缘柔化<span class="val" id="vFgFeather">3</span></div>
+          <input type="range" id="rFgFeather" min="0" max="12" value="3" step="1">
+        </div>
+        <div class="ctrl">
+          <div class="lbl">主体居中偏好<span class="val" id="vFgCenter">0.40</span></div>
+          <input type="range" id="rFgCenter" min="0" max="1" value="0.40" step="0.01">
+        </div>
+        <div class="ctrl">
+          <div class="lbl">蒙版反相</div>
+          <div class="seg" id="segFgInvert">
+            <button type="button" data-fginv="no" class="on">正常</button>
+            <button type="button" data-fginv="yes">反相</button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="lbl">背景图强度<span class="val" id="vBgWash">0.08</span></div>
+          <input type="range" id="rBgWash" min="0" max="0.5" value="0.08" step="0.01">
+        </div>
+        <div class="note">
+          前景由「细节锐度 + 饱和度 + 与背景色的差异」自动推断，识别不准时调阈值；主体不在画面中央就把居中偏好拉到 0。
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 排版 -->
+    <section>
+      <h2><span class="num">4</span>排版</h2>
+
+      <div class="ctrl">
+        <div class="lbl">列数（决定字号）<span class="val" id="vCols">96</span></div>
+        <input type="range" id="rCols" min="28" max="240" value="96" step="1">
+        <div class="hint">
+          <div class="row">列数越多字越小。画布较窄时会自动减列，避免字小到看不见</div>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">文字方向</div>
+        <div class="seg" id="segDir">
+          <button type="button" data-dir="vertical" class="on">竖排 · 右起</button>
+          <button type="button" data-dir="horizontal">横排 · 左起</button>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">文本语言</div>
+        <div class="seg two" id="segLang">
+          <button type="button" data-lang="auto" class="on">自动</button>
+          <button type="button" data-lang="ja">日本語</button>
+          <button type="button" data-lang="zh">中文</button>
+          <button type="button" data-lang="en">English</button>
+        </div>
+        <div class="hint" id="langHint">
+          <div class="row">自动 · 按文本里的假名 / 汉字 / 拉丁字母占比判断</div>
+          <div class="row">决定分词器、停用词表与「高频词」的筛选规则</div>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">取词方式</div>
+        <div class="seg" id="segSeg">
+          <button type="button" data-seg="word" class="on">分词</button>
+          <button type="button" data-seg="char">单字</button>
+        </div>
+        <div class="hint" id="segHint">
+          <div class="row on">分词 · 以词为最小单位，局部可读出词</div>
+          <div class="row">单字 · 逐字平铺，标点与空白被剔除</div>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">取词范围</div>
+        <div class="seg two" id="segSample">
+          <button type="button" data-sample="seq" class="on">顺序</button>
+          <button type="button" data-sample="sent">乱序 · 句</button>
+          <button type="button" data-sample="word">乱序 · 词</button>
+          <button type="button" data-sample="freq">高频词</button>
+        </div>
+        <button type="button" class="miniBtn" id="btnReshuffle">↻ 换一批文字</button>
+
+        <div class="seg hide" id="segStrict" style="margin-top:8px">
+          <button type="button" data-strict="loose">宽松</button>
+          <button type="button" data-strict="normal" class="on">标准</button>
+          <button type="button" data-strict="strict">严格</button>
+        </div>
+
+        <div class="freqBox hide" id="freqPreview">
+          <div class="fpHead">
+            <b id="fpLang">日本語</b> · 识别到 <b id="fpCount">0</b> 个实义词，按词频加权铺满画面<br>
+            点词可排除，再点一次恢复
+          </div>
+          <div class="fpChips" id="fpChips"></div>
+          <button type="button" class="miniBtn" id="btnFpReset" style="margin-top:8px">清空排除</button>
+        </div>
+
+        <div class="hint">
+          <div class="row">顺序 · 从开头依次取，长文只有前段能上画面</div>
+          <div class="row">乱序 · 从全书随机抽取，句内 / 词内顺序不变</div>
+          <div class="row">高频词 · 剔除虚词后，出现越多的词在画面里越多</div>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">色彩</div>
+        <div class="colorRow">
+          <input type="color" id="cInk" value="#242428">
+          <span class="cl">文字</span>
+          <input type="color" id="cBg" value="#fbfbfc">
+          <span class="cl">底色</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. 密度映射 -->
+    <section>
+      <h2><span class="num">5</span>密度 → 字形</h2>
+
+      <div class="ctrl">
+        <div class="lbl">最小字号倍率<span class="val" id="vSizeMin">0.48</span></div>
+        <input type="range" id="rSizeMin" min="0.2" max="1" value="0.48" step="0.01">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">最大字号倍率<span class="val" id="vSizeMax">1.18</span></div>
+        <input type="range" id="rSizeMax" min="1" max="1.8" value="1.18" step="0.01">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">笔画加粗上限<span class="val" id="vBold">0.55</span></div>
+        <input type="range" id="rBold" min="0" max="1.2" value="0.55" step="0.01">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">最淡不透明度<span class="val" id="vAlpha">0.10</span></div>
+        <input type="range" id="rAlpha" min="0" max="0.6" value="0.10" step="0.01">
+      </div>
+    </section>
+
+    <!-- 6. 影调 -->
+    <section>
+      <h2><span class="num">6</span>影调</h2>
+
+      <div class="ctrl">
+        <div class="lbl">对比度<span class="val" id="vContrast">1.15</span></div>
+        <input type="range" id="rContrast" min="0.4" max="2.6" value="1.15" step="0.01">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">伽马 · 明暗倾向<span class="val" id="vGamma">0.95</span></div>
+        <input type="range" id="rGamma" min="0.3" max="2.4" value="0.95" step="0.01">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">柔化半径<span class="val" id="vBlur">1</span></div>
+        <input type="range" id="rBlur" min="0" max="4" value="1" step="1">
+      </div>
+    </section>
+
+    <!-- 操作 -->
+    <section>
+      <div class="btns">
+        <button class="btn primary" id="btnRender">重新生成</button>
+        <button class="btn ghost" id="btnExport">导出 PNG</button>
+        <button class="btn ghost wide" id="btnReset">恢复默认参数</button>
+      </div>
+    </section>
+
+  </aside>
+
+  <!-- ============ 画布区 ============ -->
+  <main id="stage">
+    <div id="canvasBox">
+      <canvas id="view" width="900" height="600"></canvas>
+    </div>
+    <div id="busy">渲染中…</div>
+    <div class="empty" id="emptyTip">
+      <div class="big">QI文字成画</div>
+      <div class="small">左侧载入 EPUB / TXT 与参考图像</div>
+    </div>
+  </main>
+
+</div>
+
+<div id="toast"></div>
+
+<!-- ============ 使用说明弹窗 ============ -->
+<div id="intro" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+  <div class="card">
+    <div class="it" id="introTitle">使用说明</div>
+    <p>载入一本小说（EPUB / TXT）和一张参考图，工具会把文字按图片的明暗铺满画布——<b>亮的地方字小、暗的地方字大</b>，远看就是那张图。</p>
+    <p>左侧可调渲染模式、排版、文本语言与取词范围，调好后点<b>「导出 PNG」</b>保存。</p>
+    <p class="dis">本工具仅供个人学习、研究与兴趣创作使用，请勿用于任何商业用途。载入的小说文本、参考图像等素材，其著作权均归各自权利人所有，请确认你已获得相应授权后再使用；因使用本工具产生的侵权或其他法律纠纷，由使用者自行承担，本工具不承担任何责任。</p>
+    <button type="button" class="ok" id="btnIntroOk">确定</button>
+  </div>
+</div>
+
+<!-- JSZip：解析 EPUB -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   0. 常量与元素
+   ============================================================ */
+var FONT_STACK = '"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif JP","MS PMincho","SimSun",serif';
+
+var cvs      = document.getElementById('view');
+var ctx      = cvs.getContext('2d');
+var boxEl    = document.getElementById('canvasBox');
+var busyEl   = document.getElementById('busy');
+var emptyTip = document.getElementById('emptyTip');
+var toastEl  = document.getElementById('toast');
+
+var DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+/* 网格与节流参数 */
+var CELL_RATIO = 1.08;
+var DEBOUNCE   = 120;      /* 滑块拖动防抖 120ms */
+var STREAM_MAX = 120000;   /* 字符流上限 */
+var WORD_MAX   = 4000;     /* 词云词表上限 */
+var GRID_CACHE_MAX = 3;    /* 亮度网格缓存条数 */
+var MASK_CACHE_MAX = 2;    /* 前景蒙版缓存条数 */
+var MASK_MAX_PX = 224;     /* 蒙版最长边像素 */
+var CLOUD_STEP  = 3;       /* 词云占位网格粒度(px) */
+var CLOUD_RETRY = [1, 0.74, 0.55, 0.40];   /* 放不下时逐级缩小字号的倍率 */
+var MIN_GLYPH   = 3.2;     /* 最小可读字号(px)：小于此值不绘制 */
+
+/* ============================================================
+   1. 默认参数
+   ============================================================ */
+var DEFAULT_PARAMS = {
+  cols: 96,
+  direction: 'vertical',   /* vertical 竖排右起 | horizontal 横排左起 */
+  lang: 'auto',            /* auto 自动 | ja 日本語 | zh 中文 | en English */
+  segment: 'word',         /* word 分词 | char 单字 */
+  sample: 'seq',           /* seq 顺序 | sent 乱序·句 | word 乱序·词 | freq 高频词 */
+  sampleSeed: 1,           /* 乱序种子，换一批时重掷 */
+  freqStrict: 'normal',    /* loose 宽松 | normal 标准 | strict 严格 */
+  mode: 'yang',            /* yang | yin | texture | fill */
+  ink: '#242428',
+  bg:  '#fbfbfc',
+
+  sizeMin: 0.48,
+  sizeMax: 1.18,
+  boldMax: 0.55,
+  alphaMin: 0.10,
+  alphaMax: 1.0,
+
+  contrast: 1.15,
+  gamma: 0.95,
+  blur: 1,
+
+  /* 前景 / 背景分离（模式C、D） */
+  fgThreshold: 0.45,
+  fgFeather: 3,
+  fgCenter: 0.40,
+  fgInvert: 'no',          /* no 正常 | yes 反相 */
+  bgWash: 0.08,            /* 背景图强度 */
+  dialogueOnly: 'no',      /* no 全部文字 | yes 仅取台词（只作用于文字底纹 / 文字填充） */
+  colorVar: 0.45           /* 文字填充的彩色变化强度 */
+};
+
+function cloneParams(src){
+  var o = {}, k;
+  for(k in src){ if(Object.prototype.hasOwnProperty.call(src, k)) o[k] = src[k]; }
+  return o;
+}
+
+var params = cloneParams(DEFAULT_PARAMS);
+
+/* ============================================================
+   2. 四种渲染模式
+   ============================================================ */
+var MODE_CFG = {
+  /* 模式A：阳刻 —— 浓墨落于暗部，字为实 */
+  yang: {
+    name: '阳刻',
+    invert: true,
+    cutoff: 0.015,
+    gain: 1.0,
+    sizeLo: 1.0, sizeHi: 1.0,
+    alphaHi: 1.0,
+    cap: 36000,
+    subject: false,   /* 是否叠加抠出的主体 */
+    words: false,     /* 是否为词云填充 */
+    wash: false,      /* 是否叠加背景图 */
+    edge: 0
+  },
+  /* 模式B：阴刻 —— 浓墨落于亮部，字为虚 */
+  yin: {
+    name: '阴刻',
+    invert: false,
+    cutoff: 0.015,
+    gain: 1.0,
+    sizeLo: 1.0, sizeHi: 1.0,
+    alphaHi: 1.0,
+    cap: 36000,
+    subject: false,
+    words: false,
+    wash: false,
+    edge: 0
+  },
+  /* 模式C：文字底纹 —— 文字作纸底铺满，主体抠图叠加在上层 */
+  texture: {
+    name: '文字底纹',
+    invert: true,
+    cutoff: 0.02,
+    gain: 0.30,          /* 低反差 → 更像均匀纸纹 */
+    sizeLo: 1.00, sizeHi: 1.42,
+    alphaHi: 0.94,
+    cap: 36000,
+    subject: true,
+    words: false,
+    wash: true,
+    edge: 0
+  },
+  /* 模式D：文字填充 —— 词云填满主体轮廓，不绘制原图 */
+  fill: {
+    name: '文字填充',
+    invert: true,
+    cutoff: 0,           /* 轮廓内全铺满，明暗只由字号/粗细/透明度表现 */
+    gain: 1.45,
+    sizeLo: 1.0, sizeHi: 1.0,
+    alphaHi: 1.0,
+    cap: 36000,
+    subject: false,
+    words: true,
+    wash: true,
+    edge: 0
+  }
+};
+
+/* ============================================================
+   3. 状态
+   ============================================================ */
+var state = {
+  text: '',
+  textVer: 0,
+  img: null,
+  imgId: 0,
+
+  stream: [],
+  streamKey: '',
+  words: [],
+  wordsKey: '',
+
+  lumKey: '',
+  maskKey: '',
+
+  viewW: 900,
+  viewH: 600
+};
+
+/* ============================================================
+   4. 小工具
+   ============================================================ */
+function clamp(v, a, b){ return v < a ? a : (v > b ? b : v); }
+
+var toastTimer = 0;
+function toast(msg){
+  if(!toastEl) return;
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){
+    toastEl.classList.remove('on');
+  }, 2800);
+}
+
+/* ============================================================
+   5. 文本解码
+   顺序：UTF-8 BOM → UTF-16 BOM → 严格 UTF-8 → Shift_JIS → EUC-JP → 兜底 UTF-8
+   ============================================================ */
+var REPLACEMENT = /\uFFFD/g;
+
+function garbledRatio(s){
+  if(!s) return 0;
+  var m = s.match(REPLACEMENT);
+  var n = m ? m.length : 0;
+  return n / s.length;
+}
+
+function tryDecode(bytes, enc, fatal){
+  try{
+    return new TextDecoder(enc, { fatal: !!fatal }).decode(bytes);
+  }catch(e){
+    return null;
+  }
+}
+
+function decodeBytes(input){
+  var bytes = (input instanceof Uint8Array) ? input : new Uint8Array(input);
+
+  if(bytes.length >= 3 && bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF){
+    return { text: new TextDecoder('utf-8').decode(bytes.subarray(3)), enc: 'UTF-8 (BOM)' };
+  }
+  if(bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE){
+    return { text: new TextDecoder('utf-16le').decode(bytes.subarray(2)), enc: 'UTF-16LE' };
+  }
+  if(bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF){
+    return { text: new TextDecoder('utf-16be').decode(bytes.subarray(2)), enc: 'UTF-16BE' };
+  }
+
+  var strict = tryDecode(bytes, 'utf-8', true);
+  if(strict !== null) return { text: strict, enc: 'UTF-8' };
+
+  var sjis = tryDecode(bytes, 'shift_jis', false);
+  if(sjis !== null && garbledRatio(sjis) < 0.02) return { text: sjis, enc: 'Shift_JIS' };
+
+  var euc = tryDecode(bytes, 'euc-jp', false);
+  if(euc !== null && garbledRatio(euc) < 0.02) return { text: euc, enc: 'EUC-JP' };
+
+  var loose = tryDecode(bytes, 'utf-8', false) || '';
+  return { text: loose, enc: 'UTF-8 (兜底，可能有乱码)' };
+}
+
+/* ============================================================
+   6. 文本规范化
+   ============================================================ */
+var RE_ZERO_WIDTH = /[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g;
+var RE_FULLWIDTH  = /[\uFF01-\uFF5E]/g;
+
+function normalizeText(s){
+  if(!s) return '';
+  s = s.replace(RE_ZERO_WIDTH, '');
+  s = s.replace(/\u3000/g, ' ');
+  s = s.replace(/\u00A0/g, ' ');
+  s = s.replace(RE_FULLWIDTH, function(ch){
+    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+  });
+  s = s.replace(/[\u2010-\u2015\u2212\uFF0D]/g, '-');
+  s = s.replace(/[ \t\f\v]+/g, ' ');
+  s = s.replace(/ *\n */g, '\n');
+  s = s.replace(/\n{2,}/g, '\n');
+  return s.trim();
+}
+
+/* ============================================================
+   7. 分词 / 单字 —— 按语言取分词器
+   ============================================================ */
+var SEG_SUPPORTED = (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function');
+
+/* 当前生效的语言码（ja / zh / en），由 params.lang 或自动识别决定 */
+var segLang = '';
+var segmenter = null;
+
+/* 文本语言自动识别：假名是最可靠的判据 —— 中文文本里假名占比为 0。
+   但阈值不能太低：中文里夹一句「こんにちは」的引用就会翻转。
+   所以要求假名**相对汉字**也占到两成，而真实日文通常是四到六成。 */
+function detectLang(text){
+  if(!text) return 'ja';
+  var n = Math.min(text.length, 20000), i, c;
+  var kana = 0, han = 0, latin = 0;
+  for(i = 0; i < n; i++){
+    c = text.charCodeAt(i);
+    if((c >= 0x3040 && c <= 0x30FF) || (c >= 0xFF66 && c <= 0xFF9D)) kana++;
+    else if(c >= 0x4E00 && c <= 0x9FFF) han++;
+    else if((c >= 65 && c <= 90) || (c >= 97 && c <= 122)) latin++;
+  }
+  var jp = kana + han;
+  if(kana >= 8 && jp > 0 && kana / jp >= 0.20) return 'ja';
+  if(han / n >= 0.10) return 'zh';
+  if(latin / n >= 0.25) return 'en';
+  if(han > 0) return 'zh';
+  if(latin > 0) return 'en';
+  return 'ja';
+}
+
+var langCache = { textVer: -1, code: 'ja' };
+
+function getLang(){
+  if(params.lang && params.lang !== 'auto') return params.lang;
+  if(langCache.textVer !== state.textVer){
+    langCache.textVer = state.textVer;
+    langCache.code = detectLang(state.text || '');
+  }
+  return langCache.code;
+}
+
+/* 语言变了才重建分词器；所有用到 segmenter 的地方先调它 */
+function refreshSegmenter(){
+  var lg = getLang();
+  if(lg === segLang) return segmenter;
+  segLang = lg;
+  segmenter = null;
+  if(SEG_SUPPORTED){
+    try{ segmenter = new Intl.Segmenter(lg, { granularity: 'word' }); }
+    catch(e){
+      try{ segmenter = new Intl.Segmenter('ja', { granularity: 'word' }); }catch(e2){ segmenter = null; }
+    }
+  }
+  return segmenter;
+}
+
+var RE_PUNCT_ONLY   = /^[\p{P}\p{S}\p{Z}\s]+$/u;
+var RE_NUM_ONLY     = /^[\p{N}]+$/u;
+var RE_SINGLE_PUNCT = /^[^\p{L}\p{N}]$/u;
+var RE_REPEAT_PUNCT = /^([^\p{L}\p{N}])\1+$/u;
+/* 页码判定：整串必须是同一种数字体系，且罗马数字只认全大写
+   —— 否则英文里的 mix / dim / civic / mild 会被当成页码删掉 */
+var RE_PAGENUM      = /^[\(（\[【「『]?(?:[0-9０-９]{1,5}|[Ⅰ-Ⅻ]{1,5}|[一二三四五六七八九十百千]{1,5}|[IVXLCDM]{1,5})[\)）\]】」』]?$/;
+var RE_HAS_KANA     = /[\u3040-\u309F\u30A0-\u30FF\uFF66-\uFF9D]/;
+var RE_HAS_CJK      = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+var RE_CJK_G        = /[\u3400-\u4DBF\u4E00-\u9FFF]/g;
+
+function isMeaningfulWord(w){
+  if(!w) return false;
+  if(!w.replace(/[\s\u3000]/g, '')) return false;
+  if(RE_PUNCT_ONLY.test(w))   return false;
+  if(RE_NUM_ONLY.test(w))     return false;
+  if(RE_REPEAT_PUNCT.test(w)) return false;
+  if(w.length === 1 && RE_SINGLE_PUNCT.test(w)) return false;
+  return true;
+}
+
+/* 逐字流（模式A/B/C 用） */
+function buildStream(text, mode){
+  var out = [], i, j, ch;
+  if(!text) return out;
+
+  if(mode === 'word' && segmenter){
+    var segs = segmenter.segment(text);
+    for(var seg of segs){
+      if(!seg.isWordLike) continue;
+      var w = seg.segment;
+      if(!isMeaningfulWord(w)) continue;
+      for(j = 0; j < w.length; j++){
+        out.push(w.charAt(j));
+        if(out.length >= STREAM_MAX) return out;
+      }
+    }
+    return out;
+  }
+
+  var arr = Array.from(text);
+  for(i = 0; i < arr.length; i++){
+    ch = arr[i];
+    if(/[\s\u3000]/.test(ch)) continue;
+    if(RE_PUNCT_ONLY.test(ch)) continue;
+    out.push(ch);
+    if(out.length >= STREAM_MAX) break;
+  }
+  return out;
+}
+
+/* 词表（模式D 词云用） */
+function buildWords(text){
+  var out = [], i, j, buf = '';
+  if(!text) return out;
+
+  if(segmenter){
+    var segs = segmenter.segment(text);
+    for(var seg of segs){
+      if(!seg.isWordLike) continue;
+      var w = seg.segment;
+      if(!isMeaningfulWord(w)) continue;
+      /* 文字填充用的是「词」，必须走和「高频词」同一套实义词过滤，
+         否则 了・的・她・着 这些虚词会混进来 —— 它们频次最高，
+         会把真正的主角词挤到很小，画面就成了一片虚词。 */
+      if(!isContentWord(w)) continue;
+      out.push(w);
+      if(out.length >= WORD_MAX) break;
+    }
+    return out;
+  }
+
+  /* 降级：把连续的有效字符当作一个词 */
+  var arr = Array.from(text);
+  for(i = 0; i < arr.length; i++){
+    var ch = arr[i];
+    if(/[\s\u3000]/.test(ch) || RE_PUNCT_ONLY.test(ch) || RE_NUM_ONLY.test(ch)){
+      if(buf){ out.push(buf); buf = ''; if(out.length >= WORD_MAX) return out; }
+      continue;
+    }
+    buf += ch;
+  }
+  if(buf && out.length < WORD_MAX) out.push(buf);
+  return out;
+}
+
+/* ------------------------------------------------------------
+   取词范围：顺序 / 乱序·句 / 乱序·词
+   —— 只打乱「采样单位」，单位内部原样保留，所以局部依然读得出词
+   ------------------------------------------------------------ */
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* 分句。终止符覆盖日中西英：。！？!?.… 与换行。
+   deep=true 时把逗号、分号、冒号也算终止符 —— 只在整篇几乎切不出句子时兜底用
+   （比如通篇逗号、没有句号的网文，或英文里没有句读的片段）。 */
+var SENT_END = '。！？!?.…\n';
+var SENT_END_DEEP = '。！？!?.…\n，,；;：:';
+
+function splitSentences(text, deep){
+  var ends = deep ? SENT_END_DEEP : SENT_END;
+  var out = [], buf = '', i, ch;
+  for(i = 0; i < text.length; i++){
+    ch = text.charAt(i);
+    buf += ch;
+    if(ends.indexOf(ch) >= 0){
+      if(buf.trim()) out.push(buf);
+      buf = '';
+    }
+  }
+  if(buf.trim()) out.push(buf);
+  return out.length ? out : [text];
+}
+
+function shuffleBySentence(text, rnd){
+  var arr = splitSentences(text);
+  if(arr.length < 8 && text.length > 3000) arr = splitSentences(text, true);
+  return takeChars(shuffleArr(arr, rnd), SAMPLE_MAX);
+}
+
+function shuffleArr(arr, rnd){
+  for(var i = arr.length - 1; i > 0; i--){
+    var j = (rnd() * (i + 1)) | 0;
+    var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+
+/* 采样文本上限：下游 buildStream 只用前 STREAM_MAX(120000) 字、
+   buildWords 只用前 WORD_MAX(4000) 词，所以超过这个长度纯属浪费算力。
+   先把句子全局乱序再截断 —— 采样覆盖全书，开销与书的长度无关。 */
+var SAMPLE_MAX = 160000;
+
+function takeChars(arr, limit){
+  var out = '', i;
+  for(i = 0; i < arr.length; i++){
+    out += arr[i];
+    if(out.length >= limit) break;
+  }
+  return out;
+}
+
+/* 句级：句内顺序原样保留，只打乱句子先后 */
+function shuffleBySentence(text, rnd){
+  var arr = splitSentences(text);
+  if(arr.length < 8 && text.length > 3000) arr = splitSentences(text, true);
+  return takeChars(shuffleArr(arr, rnd), SAMPLE_MAX);
+}
+
+/* 词级：先在句级做一次全局铺开（覆盖全书），再在截断结果上按词打乱，
+   这样分词只跑 SAMPLE_MAX 个字，长书也不会卡住 */
+function shuffleByWord(text, rnd){
+  refreshSegmenter();
+  var base = shuffleBySentence(text, rnd);
+  var units = [];
+  if(segmenter){
+    for(var seg of segmenter.segment(base)){
+      if(seg.isWordLike && isMeaningfulWord(seg.segment)) units.push(seg.segment);
+    }
+  }
+  if(!units.length) units = Array.from(base);
+  /* 用换行拼接，保证重新分词时词的边界不粘连 */
+  return shuffleArr(units, rnd).join('\n');
+}
+
+/* ------------------------------------------------------------
+   高频词：日语功能词过滤 + 词频加权
+   ------------------------------------------------------------
+   「一个词到底有没有意义」在没有词典的情况下判不准，
+   但可以拆成四条**可解释、可调**的线索：
+
+     1) 是不是功能词 —— 停用词表（助词/补助动词/接续词/代词/形式名词）。
+        除了完整形式，还刻意收录了 Segmenter 可能拆出来的**碎片**：
+        けれども 若被拆成 けれ + ども，两半都在表里，照样过滤得掉。
+     2) 用什么文字写的 —— 汉字、片假名承载实义；平假名多为语法成分。
+     3) 有多长 —— 越长的词越可能是实词（3 字以上的纯假名才留）。
+     4) 出现几次 —— 只出现一次的多半是笔误或一次性引用。
+
+   「霧島透子」这类人名为什么能留下来？因为它满足「全汉字 + 2~4 字 +
+   会反复出现」，而这三点统计上正好是复合名词/专名的特征。
+   工具识别不了「这是个人名」，但能把它排进实义词 —— 这就够用了。
+   ------------------------------------------------------------ */
+
+var JP_STOP = (function(){
+  var s = [
+    /* 助词（含碎片形式） */
+    'の は が を に へ と も や か ね よ な ぞ ぜ さ わ ば し て で だ ん り き け せ め ろ つ ぬ み',
+    'から まで より など なんか なんて こそ さえ しか だけ のみ きり ほど くらい ぐらい',
+    'ばかり ながら つつ のに ので けど けども けれ ども けれど けれども では には とは とも',
+    'でも にも たり だり とか やら なり だの って という といった じゃ および かつ または もしくは',
+    /* 形式名词（有汉字写法的一并收录） */
+    'こと もの とき ところ ため わけ はず つもり ほう うち とおり かぎり たび たけ あまり',
+    '事 物 時 所 為 訳 筈 方 内 通 限 以上 以下',
+    /* 补助动词 / 断定 */
+    'ある あり いる いない いた する し して した します なる なっ なり なれ できる でき',
+    'おる ござい ござる ください くださる いただく いただき いただい いただけ くれる くれ',
+    'あげる あげ もらう もらい しまう しまい しまっ しまった ちゃう じゃう みる みて みた',
+    'おく おい いく いっ きた くる です でし ます ませ ました ません でした',
+    'だろう でしょう ましょう らしい みたい よう そう かもしれ かも',
+    /* 接续词 */
+    'そして しかし だが だから ですから それで そこで すると つまり また まだ もう さらに',
+    'しかも ただし ただ なぜなら ゆえに したがって ちなみに なお ところで さて じゃあ',
+    'それでは それじゃ あるいは ところが それに そのうえ それから なぜ どうして それなら だったら',
+    /* 代词 / 指示词（含复数形） */
+    '私 わたし わたくし 僕 ぼく 俺 おれ あたし あなた あんた 君 きみ 彼 かれ 彼女 かのじょ',
+    '自分 じぶん みんな みな 誰 だれ 誰か 何 なに なん 何か どこ どちら いつ どれ',
+    '私たち 僕たち 俺たち あなたたち 君たち 彼ら 彼女ら これら それら あれら',
+    'これ それ あれ この その あの どの ここ そこ あそこ こちら そちら あちら',
+    'こう ああ どう どんな こんな そんな あんな',
+    /* 感叹词 / 应答 / 寒暄 */
+    'はい いいえ ええ うん おお さあ ほら ねえ もし たとえ いや ううん はあ へえ ほう おい',
+    'ありがとう ごめん すみません こんにちは こんばんは おはよう さようなら よろしく',
+    'はじめまして どうも どうぞ おねがい お願い',
+    /* 数量·序数（假名写法） */
+    'ひとつ ふたつ みっつ よっつ いつつ むっつ ななつ やっつ ここのつ とお',
+    'いち に さん よん ご ろく なな はち きゅう じゅう',
+    /* 功能副词 */
+    'とても ちょっと かなり ずいぶん まったく 全然 非常に もっと いちばん 一番 いつも',
+    'ときどき たまに すぐ すぐに ずっと きっと たぶん おそらく やはり やっぱり どうも',
+    'すでに ますます だんだん どんどん しばらく たしか ぜひ 必ず ふつう たいてい しばしば',
+    'すこし 少し そのまま そのうち どうしても なんとなく いつでも どこでも だれでも',
+    'それほど これまで それまで そのため そのもの いつのまにか',
+    /* 敬称 */
+    'さん 様 ちゃん 殿 氏'
+  ].join(' ');
+
+  var set = new Set();
+  s.split(/\s+/).forEach(function(w){ if(w) set.add(w); });
+  return set;
+})();
+
+/* ------------------------------------------------------------
+   中文停用词
+   中文的功能词几乎全是**固定的一批单字**（的・了・是・在・我…），
+   所以单字不能像日文那样一律丢 —— 交给这张表逐个点名。
+   另外收录「万能名词」（情况・方面・时候…），它们不是虚词但信息量极低，
+   在词云里属于噪声。
+   ------------------------------------------------------------ */
+var ZH_STOP = (function(){
+  var s = [
+    /* 结构助词 / 语气词 / 单字虚词 */
+    '的 地 得 了 着 过 们 之 所 者 乎 兮 矣 焉 哉 乃 亦 其 此 该 每 各 某 些 与 及 或 而 但 又 再 才 更 最 太',
+    '让 被 把 给 对 从 向 往 由 于 以 为 还 只 则 若 因 故 却 并 且 已 曾 将 就 都 也 很 是 有 在 和 跟 同 用 使 叫 被',
+    '呢 吧 吗 啊 呀 哦 嗯 嘛 哈 唉 喂 哎 哟 咦 哇 喔 噢 咳 呃 嘿 嗨 啦 咯 喽 呐 咧 嘞',
+    /* 否定 / 判断 */
+    '不 没 没有 无 别 莫 勿 未 非 否 不是 不能 不会 不要 不用 不再 不过 不同 不错 别的 别说',
+    /* 「一 + 量」类固定形 */
+    '一个 一样 一起 一边 一会儿 一阵 一次 一遍 一下 一声 一般 一些 一点 一定 一直 一切 一共 一齐 一道 一同',
+    /* 单字动词 / 形容词碎片：中文叙事里高频但信息量极低，
+       而名词性的单字（山・水・风・心・雨・花・夜・光）要留住 */
+    '来 去 出 进 起 回 见 找 等 做 作 变 成 会 能 要 该 应 敢 肯 看 说 想 听 问 答',
+    '走 跑 坐 站 睡 醒 笑 哭 喊 叫 打 拉 推 拿 放 送 买 卖 吃 喝 穿 脱 洗 擦 开 关',
+    '记 忘 带 留 停 装 拆 修 换 加 减 增 改 补 扔 丢 捡 提 挂 摆 按 压 扯 拽 踩 踢',
+    '跳 蹲 躺 趴 爬 滚 摔 撞 敲 拍 握 抱 背 扛 抬 搬 移 递 接 收 发 寄 存 取 借 还',
+    '湿 干 冷 热 亮 暗 静 响 晃 抖 颤 眨 叹 咳 吸 吐 舔 咬 嚼 咽 闻 嗅 盯 瞪 瞥',
+    /* 状态副词 / 比况 */
+    '仿佛 好像 似乎 简直 仍然 依然 依旧 仍旧 依然 明明 偏偏 刚好 正好 恰好 偶然 偶尔',
+    /* 代词 / 指示词 */
+    '我 你 他 她 它 您 咱 俺 谁 哪 咋 什 么 怎 样 这 那 些 们 彼 此 吾 汝 君 卿',
+    '我们 你们 他们 她们 它们 咱们 自己 大家 别人 人家 谁 什么 哪个 哪些 哪儿 哪里 这儿 这里 那儿 那里',
+    '这些 那些 这个 那个 这样 那样 这么 那么 怎么 怎样 如何 为什么 为何 什么样 什么的',
+    /* 连词 */
+    '然后 接着 于是 所以 因此 因而 但是 可是 不过 然而 虽然 尽管 即使 如果 假如 要是 因为 由于',
+    '只要 只有 无论 不管 而且 并且 或者 还是 以及 与其 不如 不但 不仅 而是 至于 关于 例如 比如',
+    '总之 反正 否则 不然 也就是说 换句话说 与此同时 除此之外',
+    /* 副词（功能类） */
+    '很 太 最 更 都 也 又 再 才 就 还 只 仅 已 已经 曾经 正在 将要 快要 差点 几乎 大概 也许 可能',
+    '应该 必须 一定 真的 其实 当然 果然 居然 竟然 忽然 突然 渐渐 逐渐 一直 总是 经常 常常 有时',
+    '偶尔 从来 始终 马上 立刻 刚刚 刚才 早就 早已 差不多 有点儿 稍微 特别 非常 十分 极其 格外',
+    '相当 比较 挺 蛮 恐怕 未必 究竟 到底 难道 偏偏 索性 干脆 反而 竟然',
+    /* 形式动词 / 能愿动词 */
+    '可以 应该 需要 觉得 认为 知道 觉得 希望 开始 继续 进行 成为 变成 出现 发生 属于 包括',
+    '有没有 是不是 会不会 能不能 要不要 是不是 有没有',
+    /* 量词 / 数量 */
+    '个 些 只 条 张 片 块 本 件 种 类 次 回 遍 趟 场 顿 位 名 群 堆 双 对 套 副 幅 座 间 栋 层 排 列 组 批',
+    '一 二 三 四 五 六 七 八 九 十 百 千 万 亿 零 两 几 多 少 半 全 整 每 各 某',
+    '全部 所有 一切 任何 别的 其他 其它 其余 各个 每个 一些 一点 有点 许多 很多 不少 大量 少量',
+    '第一 第二 第三 最后 首先 其次 再次 之一 之类 等等 而已',
+    /* 方位 / 时间（形式用法） */
+    '上 下 里 外 中 内 前 后 左 右 东 南 西 北 边 面 处 间 时 候 之间 之中 中间 之前 之后 以上 以下',
+    '以内 以外 里面 外面 上面 下面 前面 后面 旁边 附近 周围 期间 时候 当时 此时 那时 这时 同时',
+    /* 万能名词（信息量极低） */
+    '方面 情况 时候 样子 地方 东西 事情 办法 方法 方式 原因 结果 过程 部分 条件 关系 作用 意思',
+    '意义 感觉 想法 观点 态度 目的 目标 标准 要求 内容 问题 基础 影响 程度 范围 数量 质量 价值',
+    '水平 能力 性质 状态 现象 事实 道理 办法 样子',
+    /* 功能词二元组：分词器会把「也+不」「就+都」这类相邻虚词粘成一个词，
+       单字表拦不住（两个字都在表里、但整词不在表里），于是它们靠频次冲到大号。
+       这里直接把常见组合列出来，两条链路（高频词 / 文字填充）都受益。 */
+    '也不 也都 也就 也很 也还 也把 也被 也去 也来 也到 也像 也想 也说 也看 也要 也会 也能 也行 也等',
+    '就都 就很 就再 就还 就被 就别 就等 就要 就会 就能 就等 才不 才要 才有 才会 才好 才行',
+    '也是 就是 都是 全是 更是 最是 真是 正是 老是 仍是 又是 才是 还是 可是 便是 却是 亦是 即是 于是',
+    '是我 是你 是他 是她 是它 是在 是要 是不 是真 是有 在了 有的 了的 是的 真的 的了',
+    '有了 没了 都在 都很 都不 都没 都会 都能 才能 只是 只有 只好 只管',
+    '不然 不再 不行 不同 不知 不懂 不想 不说 不看 不听 不问 不会 不能 不要 不用 不过',
+    '这样一来 那样一来 什么的 之类的 一样 一起 一直 一边 一定 一些 一点 一下 一声 一般'
+  ].join(' ');
+  var set = new Set();
+  s.split(/\s+/).forEach(function(w){ if(w) set.add(w); });
+  return set;
+})();
+
+/* ------------------------------------------------------------
+   英文停用词（标准表 + 常见缩写形）
+   英文的判定逻辑和日中完全不同：不靠文字种类，靠**长度 + 首字母大小写**。
+   1~2 字母的英文词几乎全是功能词，所以硬闸直接卡 length >= 3。
+   ------------------------------------------------------------ */
+var EN_STOP = (function(){
+  var s = [
+    'a an the and or but nor so yet for if then than that this these those there here when where why how',
+    'i me my mine myself you your yours yourself he him his himself she her hers herself it its itself',
+    'we us our ours ourselves they them their theirs themselves who whom whose which what whatever',
+    'be am is are was were been being do does did done doing have has had having will would shall',
+    'should can could may might must ought need dare used',
+    'of in on at to from by with without about against between into through during before after above',
+    'below up down out off over under again further once only just too very also not no yes as such',
+    'all any both each few more most other some none every either neither many much several own same',
+    'because while although though unless until since whether whereas therefore however moreover',
+    'also then thus hence otherwise instead besides nevertheless nonetheless furthermore meanwhile',
+    'always never often sometimes usually rarely already still yet soon now today tomorrow yesterday',
+    'here there everywhere anywhere somewhere nowhere away back forth together apart along across',
+    'per via upon within among amongst towards toward during despite regarding concerning',
+    'am pm etc eg ie vs mr mrs ms dr st rd th nd',
+    's t re ve ll d m o y ain aren couldn didn doesn hadn hasn haven isn ma mightn mustn needn shan',
+    'shouldn wasn weren won wouldn wouldn'
+  ].join(' ');
+  var set = new Set();
+  s.split(/\s+/).forEach(function(w){ if(w) set.add(w); });
+  return set;
+})();
+var RE_KANJI = /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+var RE_KATA  = /[\u30A1-\u30FA\u30FD\u30FE\uFF66-\uFF9D]/;   /* 排除 ー 与 ・ */
+var RE_HIRA  = /[\u3040-\u309F]/;
+var RE_LATIN = /[A-Za-z]/;
+var RE_DIGIT = /[0-9０-９]/;
+
+/* 平假名词尾的语法模式：命中就说明这是活用形而不是实词 */
+var RE_KANA_SUFFIX = /(ている|ていた|てる|てた|てしま|ちゃう|じゃう|ました|ません|です|ます|ませ|ながら|ばかり|しか|だけ|ほど|くらい|ぐらい|ので|のに|けど|けれど|けれども|って|では|には|とは|でも|など|なんか|なんて|こそ|さえ|から|まで|より|という|として|としては|としても|ように|ような|ようで|ようと|ようだ|よう)$/;
+
+function wordKind(w){
+  return {
+    kanji: RE_KANJI.test(w),
+    kata:  RE_KATA.test(w),
+    hira:  RE_HIRA.test(w),
+    latin: RE_LATIN.test(w),
+    digit: RE_DIGIT.test(w)
+  };
+}
+
+/* ============================================================
+   高频词 —— 三种语言各一套「硬闸 + 评分」
+   日语、中文靠**文字种类**判断，英文靠**长度 + 首字母大小写**
+   ============================================================ */
+
+/* ---------- 日本語 ---------- */
+function hardJa(w){
+  if(JP_STOP.has(w)) return false;
+  var k = wordKind(w);
+  if(k.latin || k.digit) return false;
+  if(!k.kanji && !k.kata && !k.hira) return false;   /* 只剩 ー ・ 之类的记号 */
+
+  var n = w.length;
+  if(n === 1){
+    /* 单个假名一定是助词或词尾（の・は・て・た），
+       单个汉字仍可能是实词（空・風・心・雨・声） */
+    return k.kanji && !k.kata;
+  }
+  if(k.hira && !k.kanji && !k.kata){
+    if(n < 3) return false;                          /* 两字纯假名基本是语法词 */
+    if(RE_KANA_SUFFIX.test(w)) return false;
+  }
+  return true;
+}
+
+function qualityJa(w){
+  var k = wordKind(w), n = w.length, q = 0;
+  if(k.kanji) q += 0.40;
+  if(k.kata)  q += 0.34;
+  if(k.kanji && n === 1) q += 0.10;                                   /* 空・風・心 */
+  if(k.kanji && !k.hira && !k.kata && n >= 2 && n <= 4) q += 0.14;    /* 約束・霧島透子 */
+  if(n >= 3) q += 0.12;
+  if(n >= 4) q += 0.08;
+  if(k.hira && !k.kanji && !k.kata){                                  /* ゆっくり・ゆらゆら */
+    if(n >= 4) q += 0.16;
+    else if(n === 3) q += 0.05;
+  }
+  return q;
+}
+
+/* ---------- 中文 ---------- */
+/* 中文不能像日文那样「单字一律弃」：山・水・风・心・雨 都是实词。
+   好在中文的功能词绝大多数是**固定的一批单字**，停用词表能兜住。 */
+/* 中文分词器会把「动词 + 了/着/过/在」切成一个词（叫了・站在・走过）。
+   这类整体要丢掉，但不能用「尾字在停用词表里」来判 —— 那会连 存在・现在 一起误杀。
+   所以单独列一份**只用于剥尾**的动词/代词小表。 */
+var ZH_TAIL_STEM = new Set(('他 她 它 我 你 您 咱 谁 这 那 什 怎 每 各 某 大 小 多 少 ' +
+  '叫 站 坐 走 跑 看 说 想 听 问 答 来 去 出 进 起 回 见 找 等 做 作 变 成 会 能 要 该 ' +
+  '打 拉 推 拿 放 送 买 卖 吃 喝 停 记 忘 带 留 笑 哭 喊 醒 睡 挂 摆 转 翻 落 升 掉 倒 ' +
+  '念 吹 传 望 瞧 盯 瞪 瞥 摸 碰 摇 晃 抖 颤 甩 扔 丢 捡 抓 握 抱 搂 亲 吻 咬 舔 咽 吐 ' +
+  '喘 叹 咳 唱 跳 舞 奔 飞 游 爬 滚 摔 敲 拍 踢 踩 踏 蹲 跪 躺 趴 靠 依 挤 钻 逃 躲 藏 ' +
+  '追 赶 拦 挡 扯 拽 拧 撕 折 烧 燃 熄 灭 洗 擦 穿 脱 装 拆 修 换 加 减 改 补 种 切 煮 ' +
+  '端 捧 数 量 称 举 挥 指 点 碰 撞 递 接 收 发 寄 取 借 还 认 信 猜 懂 怕 恨 爱 惜 盼').split(' '));
+
+function hardZh(w){
+  if(ZH_STOP.has(w)) return false;
+  var n = w.length;
+  if(n < 1) return false;
+  /* 「代词/指示词 + 的/地/们」整体：他的・我们的・什么的・这样的
+     注意**不能带「得」** —— 记得・觉得・懂得・值得 都是实词，带了会被误杀。 */
+  if(n >= 2 && /[的地们]$/.test(w) && ZH_STOP.has(w.slice(0, -1))) return false;
+  /* 「动词 + 了/着/过/在」碎片：叫了・站在・走过 */
+  if(n >= 2 && /[了着过在]$/.test(w) && ZH_TAIL_STEM.has(w.slice(0, -1))) return false;
+  if(RE_LATIN.test(w)) return n >= 3 && !RE_DIGIT.test(w);   /* 允许 iPhone / KTV 这类 */
+  if(RE_DIGIT.test(w)) return false;
+  return RE_KANJI.test(w);                                   /* 其余必须是汉字 */
+}
+
+function qualityZh(w, proper){
+  if(RE_LATIN.test(w)) return qualityEn(w, proper);           /* 混排的英文词按英文评分 */
+  var n = w.length, q = 0;
+  if(n === 1)      q += 0.22;    /* 单字实词：山・水・风 */
+  else if(n === 2) q += 0.38;    /* 双字词是中文实词的主体 */
+  else if(n === 3) q += 0.54;    /* 三字词：音乐会 */
+  else             q += 0.60;    /* 四字成语及以上 */
+  q += 0.14;                     /* 汉字本身承载实义 */
+  return q;
+}
+
+/* ---------- English ---------- */
+function hardEn(w){
+  if(EN_STOP.has(w.toLowerCase())) return false;
+  if(w.length < 3) return false;                    /* 1~2 字母的英文词几乎都是功能词 */
+  return /^[A-Za-z][A-Za-z'-]*$/.test(w);
+}
+
+function qualityEn(w, proper){
+  var n = w.length, q = 0.16;
+  if(n >= 4) q += 0.18;
+  if(n >= 6) q += 0.16;
+  if(n >= 9) q += 0.10;
+  if(proper) q += 0.22;                             /* 永远大写 → 专名 */
+  return q;
+}
+
+/* 轻量词形归并：只合并复数与常见的 -ing/-ed，
+   目的是别把 said / say / says 拆成三个词。刻意做得保守。 */
+var EN_NO_STRIP_S = new Set(('always perhaps sometimes clothes news series means cross class glass less ' +
+  'this his was has is us yes plus various obvious famous serious previous nervous jealous ' +
+  'dangerous delicious religious anxious curious generous business happiness darkness ' +
+  'campus status bonus virus focus genius circus octopus chorus corpus surplus census consensus apparatus').split(' '));
+/* 本身就以 -ing / -ed 结尾、但不是进行/过去式的词，剥了会出假词或撞词 */
+var EN_KEEP_ING = new Set('morning evening ceiling darling opening feeling meeting meaning warning clothing'.split(' '));
+var EN_KEEP_ED  = new Set('hundred sacred wicked naked indeed speed breed greed tired excited ashamed'.split(' '));
+
+function stemEn(w){
+  var s = w.toLowerCase();
+  if(s.length <= 3) return s;
+  if(/ese$/.test(s)) return s;                                          /* japanese / chinese / cheese */
+  if(/is$/.test(s))  return s;                                          /* paris / tennis / analysis */
+  if(/ies$/.test(s) && s.length > 4) return s.slice(0, -3) + 'y';       /* stories → story */
+  if(/(ses|xes|zes|ches|shes)$/.test(s)) return s.slice(0, -2);         /* boxes → box */
+  if(/[^s]s$/.test(s) && !EN_NO_STRIP_S.has(s)) return s.slice(0, -1);  /* words → word */
+  if(/ing$/.test(s) && s.length > 5 && !EN_KEEP_ING.has(s)){
+    var b = s.slice(0, -3);
+    if(b.length < 3) return s;
+    if(/([bdfglmnprt])\1$/.test(b)) b = b.slice(0, -1);                 /* running → run */
+    if(/v$/.test(b) || /[bdptkgfc]l$/.test(b)) b += 'e';                /* having → have / trembling → tremble */
+    return b;
+  }
+  if(/ed$/.test(s) && s.length > 4 && !EN_KEEP_ED.has(s)){
+    var b2 = s.slice(0, -2);
+    if(b2.length < 3) return s;
+    if(/([bdfglmnprt])\1$/.test(b2)) b2 = b2.slice(0, -1);              /* stopped → stop */
+    if(/v$/.test(b2) || /[bdptkgfc]l$/.test(b2)) b2 += 'e';             /* moved → move / trembled → tremble */
+    return b2;
+  }
+  return s;
+}
+
+/* ---------- 语言表 ---------- */
+var LANGS = {
+  ja: { name: '日本語',  seg: 'ja', hard: hardJa, quality: qualityJa, stem: null },
+  zh: { name: '中文',    seg: 'zh', hard: hardZh, quality: qualityZh, stem: null },
+  en: { name: 'English', seg: 'en', hard: hardEn, quality: qualityEn, stem: stemEn }
+};
+
+function isContentWord(w){
+  var cfg = LANGS[getLang()] || LANGS.ja;
+  return cfg.hard(w);
+}
+
+/* 三档严格度：实义分下限 / 最少出现次数
+   —— 标准档约等于「含汉字或片假名」；严格档只留强实义特征 */
+var FREQ_LEVEL = {
+  loose:  { q: 0.15, min: 1 },
+  normal: { q: 0.33, min: 2 },
+  strict: { q: 0.50, min: 2 }
+};
+
+var FREQ_SCAN_MAX = 500000;   /* 统计词频最多扫这么多字，够代表全书词汇 */
+var FREQ_TOP      = 600;      /* 参与排行的最高频词数量 */
+var FREQ_POOL     = 46000;    /* 加权池槽位（约够填满 STREAM_MAX 120000 字） */
+var FREQ_MAXREP   = 9;        /* 最高频词在一个池周期里出现的次数 */
+
+var freqCache    = { key: '', words: [], total: 0, kept: 0 };
+var freqExcluded = new Set();   /* 用户手动排除的词 */
+var freqExclVer  = 0;           /* 排除集合的版本号，参与缓存 key */
+
+function analyzeFrequency(){
+  refreshSegmenter();
+  var lg = getLang();
+  var cfg = LANGS[lg] || LANGS.ja;
+  var key = lg + '|' + state.textVer + '|' + params.freqStrict + '|' + freqExclVer +
+            '|' + (dialogueActive() ? 'd' : '-');
+  if(freqCache.key === key) return freqCache;
+
+  var lv = FREQ_LEVEL[params.freqStrict] || FREQ_LEVEL.normal;
+  var empty = { key: key, words: [], total: 0, kept: 0, lang: lg };
+
+  var src = srcText();
+  if(!src || !segmenter){ freqCache = empty; return freqCache; }
+
+  var scan = src.length > FREQ_SCAN_MAX
+    ? src.slice(0, FREQ_SCAN_MAX)
+    : src;
+
+  /* 按「词干」聚合。日中不需要归并（stem 为 null，词干就是原词）；
+     英文归并复数与 -ing/-ed，避免 said / say / says 被算成三个词。 */
+  var agg = new Map(), total = 0;
+  for(var seg of segmenter.segment(scan)){
+    if(!seg.isWordLike) continue;
+    var w = seg.segment;
+    if(!cfg.hard(w)) continue;
+    total++;
+
+    var st = cfg.stem ? cfg.stem(w) : w;
+    var rec = agg.get(st);
+    if(!rec){
+      rec = { stem: st, count: 0, forms: new Map(), cap: 0, low: 0 };
+      agg.set(st, rec);
+    }
+    rec.count++;
+    rec.forms.set(w, (rec.forms.get(w) || 0) + 1);
+
+    /* 英文专名判据：一个词如果**从来没有小写出现过**，它多半是专名
+       （普通名词在长文里总会有小写出现） */
+    if(lg === 'en'){
+      var c0 = w.charAt(0);
+      if(c0 >= 'A' && c0 <= 'Z') rec.cap++; else rec.low++;
+    }
+  }
+
+  var list = [];
+  agg.forEach(function(rec){
+    if(rec.count < lv.min) return;
+
+    /* 展示用最高频的那个表面形（英文归并后可能有好几种写法） */
+    var disp = rec.stem, best = -1;
+    if(lg === 'en'){
+      /* 英文展示形态：优先用「在文中真的单独出现过」的词干（remembered→remember、
+         eyes→eye）—— 既归并了变形，又绝不会凭空造出 hundr / japane 这种假词。
+         词干没出现过时，退回**最短**的那个词形。 */
+      if(!rec.forms.has(rec.stem)){
+        var bestLen = Infinity, bestCnt = -1;
+        rec.forms.forEach(function(c, f){
+          if(f.length < bestLen || (f.length === bestLen && c > bestCnt)){
+            bestLen = f.length; bestCnt = c; disp = f;
+          }
+        });
+      }
+    }else{
+      rec.forms.forEach(function(c, f){ if(c > best){ best = c; disp = f; } });
+    }
+
+    var proper = (lg === 'en' && rec.low === 0 && rec.cap >= 2);
+    if(proper && !/^[A-Z]/.test(disp)) disp = disp.charAt(0).toUpperCase() + disp.slice(1);
+
+    if(freqExcluded.has(disp) || freqExcluded.has(rec.stem)) return;
+
+    var q = cfg.quality(disp, proper);
+    if(q < lv.q) return;
+    list.push({ w: disp, freq: rec.count, q: q, rank: rec.count * (0.55 + q) });
+  });
+
+  /* 词频为主，实义程度为辅；再同分时按词频、最后按字典序，保证结果确定 */
+  list.sort(function(a, b){
+    if(b.rank !== a.rank) return b.rank - a.rank;
+    if(b.freq !== a.freq) return b.freq - a.freq;
+    return a.w < b.w ? -1 : (a.w > b.w ? 1 : 0);
+  });
+
+  freqCache = { key: key, words: list, total: total, kept: list.length, lang: lg };
+  return freqCache;
+}
+
+/* 把高频词铺成一个「出现越多的词重复越多次」的池子，再整体打乱，
+   这样画面里高频词自然占多数，又不会全挤在开头 */
+function buildFrequencyText(){
+  var a = analyzeFrequency();
+  var top = a.words.slice(0, FREQ_TOP);
+  if(!top.length) return '';
+
+  var maxF = top[0].freq || 1;
+  var slots = [], i, j;
+  for(i = 0; i < top.length; i++){
+    var t = top[i];
+    var r = t.freq / maxF;
+    /* 指数 >1 让高频词与中频词的差距拉得更开，画面上才看得出「谁最多」 */
+    var reps = Math.max(1, Math.round(1 + (FREQ_MAXREP - 1) * Math.pow(r, 1.3)));
+    for(j = 0; j < reps; j++) slots.push(t.w);
+  }
+  if(!slots.length) return '';
+
+  var pool = [];
+  while(pool.length < FREQ_POOL){
+    for(i = 0; i < slots.length && pool.length < FREQ_POOL; i++) pool.push(slots[i]);
+  }
+  var rnd = mulberry32(((params.sampleSeed || 1) * 2246822519) >>> 0);
+  shuffleArr(pool, rnd);
+  /* 换行拼接，保证下游重新分词时词边界不粘连 */
+  return pool.join('\n');
+}
+
+var sampleCache = { key: '', text: '' };
+
+/* ------------------------------------------------------------
+   仅取台词
+   —— 参考图那类作品基本只用对白，所以给「文字底纹 / 文字填充」单开一个开关：
+      只保留成对引号里的内容，以及「：」之后的内容。
+   ------------------------------------------------------------ */
+/* 成对引号分开写，避免「」和 ” 交叉配对；不含『』—— 那多半是书名不是台词 */
+var RE_DLG_QUOTE    = /「([^」\n]{1,400})」|“([^”\n]{1,400})”|"([^"\n]{1,400})"/g;
+var RE_DLG_COLON_JP = /^([^\n：]{1,24})：\s*([^\n]{2,300})$/gm;                       /* 全角冒号 */
+var RE_DLG_COLON_EN = /^([A-Za-z\u4E00-\u9FFF][^\n:：]{0,23}):[ \t]*(?!\/\/)([^\n]{2,300})$/gm;
+/* 「时间：」「备注：」这类是元信息不是台词，前缀命中就直接丢 */
+var DLG_LABEL = new Set(('时间 日期 地点 备注 注意 地址 电话 作者 来源 翻译 校对 简介 摘要 目录 后记 ' +
+  '注释 说明 标题 分类 标签 状态 版本 页码 字数 价格 出版社 相关 推荐 声明 版权 投稿 联系 邮箱 ' +
+  '网址 链接 参考 引用 摘自 更新 发布时间 角色 登场 章 节 卷 页 序章 前言 目录 收录 转载').split(/\s+/));
+
+var dlgCache = { ver: -1, text: '' };
+
+function extractDialogue(text){
+  if(!text) return '';
+  var out = [], m, s;
+
+  /* 先把成对引号里的内容抠出来，同时把引号段从正文里抹掉 ——
+     否则下面的「冒号规则」会把同一句话再抓一遍 */
+  RE_DLG_QUOTE.lastIndex = 0;
+  var masked = text.replace(RE_DLG_QUOTE, function(all, g1, g2, g3){
+    s = String(g1 || g2 || g3 || '').trim();
+    if(s) out.push(s);
+    return '\u3000';
+  });
+
+  var pats = [RE_DLG_COLON_JP, RE_DLG_COLON_EN];
+  for(var p = 0; p < pats.length; p++){
+    pats[p].lastIndex = 0;
+    while((m = pats[p].exec(masked))){
+      if(DLG_LABEL.has(String(m[1] || '').trim())) continue;      /* 时间：/备注：… */
+      s = String(m[2] || '').replace(/^[「“"]+/, '').replace(/[」”"]+$/, '').trim();
+      if(!s) continue;
+      if(/^[\d\s年月日号时点分秒:：\-\/\.]+$/.test(s)) continue;   /* 纯日期 / 纯数字 */
+      out.push(s);
+    }
+  }
+  return out.join('\n');
+}
+
+/* 这个开关只对「文字底纹」(subject) 与「文字填充」(words) 生效 */
+function dialogueActive(){
+  if(params.dialogueOnly !== 'yes') return false;
+  var cfg = MODE_CFG[params.mode];
+  return !!(cfg && (cfg.words || cfg.subject));
+}
+
+function getDialogueText(){
+  if(dlgCache.ver === state.textVer) return dlgCache.text;
+  dlgCache.ver = state.textVer;
+  dlgCache.text = extractDialogue(state.text || '');
+  return dlgCache.text;
+}
+
+/* 真正参与取词的文本：开了「仅取台词」且确实抓到台词时才替换，否则退回全文 */
+function srcText(){
+  if(!dialogueActive()) return state.text;
+  return getDialogueText() || state.text;
+}
+
+function getSampledText(){
+  refreshSegmenter();
+  var key = getLang() + '|' + params.sample + '|' + params.sampleSeed + '|' + state.textVer +
+            '|' + (dialogueActive() ? 'd' : '-') +
+            (params.sample === 'freq' ? '|' + params.freqStrict + '|' + freqExclVer : '');
+  if(sampleCache.key === key) return sampleCache.text;
+
+  var src = srcText();
+  var t;
+  if(params.sample === 'seq' || !src){
+    t = src;
+  }else if(params.sample === 'freq'){
+    t = buildFrequencyText();
+  }else{
+    var rnd = mulberry32((params.sampleSeed * 2654435761) >>> 0);
+    t = (params.sample === 'word')
+      ? shuffleByWord(src, rnd)
+      : shuffleBySentence(src, rnd);
+  }
+
+  sampleCache.key = key;
+  sampleCache.text = t;
+  return t;
+}
+
+/* 采样相关的缓存判别串：高频词模式下严格度与排除集合也会改变取到的文本 */
+function sampleTag(){
+  return getLang() + ':' + params.sample + ':' + params.sampleSeed +
+    (dialogueActive() ? ':d' : '') +
+    (params.sample === 'freq' ? ':' + params.freqStrict + ':' + freqExclVer : '');
+}
+
+function getStream(){
+  refreshSegmenter();
+  var key = params.segment + ':' + state.textVer + ':' + sampleTag();
+  if(state.streamKey !== key){
+    state.stream = buildStream(getSampledText(), params.segment);
+    state.streamKey = key;
+  }
+  return state.stream;
+}
+
+function getWords(){
+  refreshSegmenter();
+  var key = params.segment + ':' + state.textVer + ':' + sampleTag();
+  if(state.wordsKey !== key){
+    state.words = buildWords(getSampledText());
+    state.wordsKey = key;
+  }
+  return state.words;
+}
+
+/* ============================================================
+   8. EPUB 清洗
+   ============================================================ */
+var BLOCK_SEL = 'p,div,h1,h2,h3,h4,h5,h6,li,blockquote,td,th,dd,dt,section,article,figure,figcaption,pre,tr,ul,ol,table';
+var RE_NOISE_HEAD = /^(目\s*次|目\s*錄|目\s*录|contents|table of contents|版权|copyright|版權|奥付|奥附|著作権|まえがき|前書き|あとがき|後書き|序文|はしがき|前言|後記|后记|谢辞|謝辞|广告|広告|凡例|刊行の辞|本文について)/i;
+
+function removeEl(el){ if(el && el.parentNode) el.parentNode.removeChild(el); }
+function removeAll(list){
+  for(var i = list.length - 1; i >= 0; i--) removeEl(list[i]);
+}
+
+function resolvePath(baseDir, href){
+  href = String(href || '').split('#')[0];
+  if(!href) return '';
+  if(href.charAt(0) === '/') return href.slice(1);
+
+  var combined = (baseDir || '') + href;
+  var parts = combined.split('/');
+  var out = [];
+  for(var i = 0; i < parts.length; i++){
+    var p = parts[i];
+    if(p === '' || p === '.') continue;
+    if(p === '..'){ if(out.length) out.pop(); }
+    else out.push(p);
+  }
+  return out.join('/');
+}
+
+function hasKana(s){ return RE_HAS_KANA.test(s || ''); }
+function hasCJK(s){ return RE_HAS_CJK.test(s || ''); }
+
+function isChineseLine(s){
+  if(!s) return false;
+  if(hasKana(s)) return false;
+  if(!hasCJK(s)) return false;
+  if(s.length < 6) return false;
+  var m = s.match(RE_CJK_G);
+  var n = m ? m.length : 0;
+  return n >= 4 && (n / s.length) > 0.5;
+}
+
+function extractBlocks(doc){
+  var root = doc.body || doc.documentElement;
+  if(!root) return [];
+
+  var brs = doc.querySelectorAll('br');
+  for(var b = 0; b < brs.length; b++){
+    var tn = doc.createTextNode('\n');
+    if(brs[b].parentNode) brs[b].parentNode.replaceChild(tn, brs[b]);
+  }
+
+  removeAll(doc.querySelectorAll(
+    'script,style,noscript,iframe,svg,canvas,audio,video,object,embed,link,meta,' +
+    'rt,rp,ruby,nav,header,footer,form,input,button,select,textarea'
+  ));
+
+  var els = doc.querySelectorAll('*');
+  for(var i = 0; i < els.length; i++){
+    var el = els[i];
+    if(!doc.contains(el)) continue;
+
+    var et = '';
+    try{
+      et = el.getAttribute('epub:type') ||
+           el.getAttributeNS('http://www.idpf.org/2007/ops', 'type') || '';
+    }catch(e){ et = ''; }
+
+    var role = '';
+    try{ role = el.getAttribute('role') || ''; }catch(e){ role = ''; }
+
+    if(/toc|page-list|pagebreak|copyright|colophon|cover|titlepage/i.test(et + ' ' + role)){
+      removeEl(el);
+      continue;
+    }
+
+    if(!el.children.length){
+      var t = (el.textContent || '').replace(/[\s\u3000\u00A0]+/g, '');
+      if(t && t.length <= 6 && RE_PAGENUM.test(t)) removeEl(el);
+    }
+  }
+
+  var all = root.querySelectorAll(BLOCK_SEL);
+  var blocks = [];
+  for(var k = 0; k < all.length; k++){
+    var node = all[k];
+    if(node.querySelector(BLOCK_SEL)) continue;
+    var txt = (node.textContent || '')
+      .replace(/[ \t\u3000\u00A0]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .trim();
+    if(txt) blocks.push(txt);
+  }
+
+  if(!blocks.length){
+    var raw = (root.textContent || '')
+      .replace(/[ \t\u3000\u00A0]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .trim();
+    if(raw) blocks.push(raw);
+  }
+
+  return blocks;
+}
+
+function docBlocks(doc){
+  var blocks = extractBlocks(doc);
+  if(!blocks.length) return [];
+
+  var head = blocks[0] || '';
+  var total = blocks.join('').length;
+
+  if(RE_NOISE_HEAD.test(head) && (blocks.length <= 2 || total < 300)) return [];
+
+  return blocks;
+}
+
+function blocksToText(docs, bilingual){
+  var out = [];
+  for(var d = 0; d < docs.length; d++){
+    var blocks = docs[d];
+    for(var i = 0; i < blocks.length; i++){
+      var lines = blocks[i].split('\n');
+      for(var j = 0; j < lines.length; j++){
+        var ln = lines[j].trim();
+        if(!ln) continue;
+        if(bilingual && isChineseLine(ln)) continue;
+        var flat = ln.replace(/[\s\u3000]+/g, '');
+        if(flat && flat.length <= 6 && RE_PAGENUM.test(flat)) continue;
+        if(RE_PUNCT_ONLY.test(ln)) continue;
+        out.push(ln);
+      }
+    }
+  }
+  return out.join('\n');
+}
+
+/* ============================================================
+   9. EPUB 解析
+   ============================================================ */
+async function parseEPUB(file){
+  if(!window.JSZip) throw new Error('JSZip 未加载，EPUB 解析组件不可用');
+
+  var zip;
+  try{
+    zip = await JSZip.loadAsync(file);
+  }catch(e){
+    throw new Error('EPUB 解压失败（文件损坏或不是有效的 ZIP）');
+  }
+
+  var opfPath = null;
+
+  var containerFile = zip.file('META-INF/container.xml');
+  if(containerFile){
+    try{
+      var containerXml = await containerFile.async('string');
+      var cdoc = new DOMParser().parseFromString(containerXml, 'application/xml');
+      var rootfile = cdoc.querySelector('rootfile');
+      if(rootfile) opfPath = rootfile.getAttribute('full-path');
+    }catch(e){}
+  }
+
+  if(!opfPath){
+    var names = Object.keys(zip.files);
+    for(var i = 0; i < names.length; i++){
+      if(/\.opf$/i.test(names[i])){ opfPath = names[i]; break; }
+    }
+  }
+  if(!opfPath) throw new Error('EPUB 结构异常：找不到 OPF 文件');
+
+  var opfFile = zip.file(opfPath);
+  if(!opfFile) throw new Error('EPUB 结构异常：OPF 文件不存在');
+
+  var opfXml = await opfFile.async('string');
+  var odoc = new DOMParser().parseFromString(opfXml, 'application/xml');
+
+  var manifest = {};
+  var items = odoc.querySelectorAll('manifest > item');
+  for(var m = 0; m < items.length; m++){
+    var mid = items[m].getAttribute('id');
+    var mhref = items[m].getAttribute('href');
+    if(mid && mhref) manifest[mid] = mhref;
+  }
+
+  var spineHrefs = [];
+  var refs = odoc.querySelectorAll('spine > itemref');
+  for(var s = 0; s < refs.length; s++){
+    var idref = refs[s].getAttribute('idref');
+    if(idref && manifest[idref]) spineHrefs.push(manifest[idref]);
+  }
+  if(!spineHrefs.length){
+    for(var kk in manifest){
+      if(Object.prototype.hasOwnProperty.call(manifest, kk)){
+        if(/\.(x?html?|htm)$/i.test(manifest[kk])) spineHrefs.push(manifest[kk]);
+      }
+    }
+  }
+  if(!spineHrefs.length) throw new Error('EPUB 中没有可读取的内容文件（spine 为空）');
+
+  var opfDir = opfPath.indexOf('/') >= 0
+    ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1)
+    : '';
+
+  var docs = [];
+  var encSet = {};
+  var garbled = false;
+  var failed = 0;
+
+  for(var n = 0; n < spineHrefs.length; n++){
+    var full = resolvePath(opfDir, spineHrefs[n]);
+    var f = zip.file(full) || zip.file(decodeURIComponent(full));
+    if(!f){ failed++; continue; }
+
+    var bytes = await f.async('uint8array');
+    var dec = decodeBytes(bytes);
+    encSet[dec.enc] = 1;
+    if(garbledRatio(dec.text) > 0.005) garbled = true;
+
+    var html = dec.text;
+    if(!html || !html.trim()) continue;
+
+    var doc;
+    try{
+      doc = new DOMParser().parseFromString(html, 'application/xhtml+xml');
+      if(doc.querySelector('parsererror')) throw new Error('xhtml');
+    }catch(e){
+      try{
+        doc = new DOMParser().parseFromString(html, 'text/html');
+      }catch(e2){
+        failed++;
+        continue;
+      }
+    }
+
+    var blocks = docBlocks(doc);
+    if(blocks.length) docs.push(blocks);
+  }
+
+  if(!docs.length){
+    throw new Error('EPUB 清洗后未提取到正文' + (failed ? '（' + failed + ' 个文件解析失败）' : ''));
+  }
+
+  var bilingual = false;
+  for(var a = 0; a < docs.length && !bilingual; a++){
+    for(var b2 = 0; b2 < docs[a].length; b2++){
+      if(hasKana(docs[a][b2])){ bilingual = true; break; }
+    }
+  }
+
+  var text = normalizeText(blocksToText(docs, bilingual));
+  if(!text) throw new Error('EPUB 清洗后正文为空（可能全被判定为目录/版权/译文）');
+
+  return {
+    text: text,
+    enc: Object.keys(encSet).join(' / '),
+    garbled: garbled,
+    bilingual: bilingual
+  };
+}
+
+/* ============================================================
+   10. 图像工具：等比裁切 / 模糊 / 亮度网格 / 轮廓图
+   ============================================================ */
+function computeCover(img, destW, destH){
+  var iw = img.naturalWidth  || img.width;
+  var ih = img.naturalHeight || img.height;
+  if(!iw || !ih) return null;
+
+  var ia = iw / ih;
+  var da = destW / destH;
+  var sx, sy, sw, sh;
+
+  if(ia > da){
+    sh = ih; sw = ih * da; sx = (iw - sw) / 2; sy = 0;
+  }else{
+    sw = iw; sh = iw / da; sx = 0; sy = (ih - sh) / 2;
+  }
+  return { sx: sx, sy: sy, sw: sw, sh: sh };
+}
+
+function boxBlur(src, C, R, radius){
+  if(radius <= 0) return src;
+
+  var tmp = new Float32Array(C * R);
+  var out = new Float32Array(C * R);
+  var d = radius * 2 + 1;
+  var x, y, sum, row;
+
+  for(y = 0; y < R; y++){
+    row = y * C;
+    sum = 0;
+    for(x = -radius; x <= radius; x++) sum += src[row + clamp(x, 0, C - 1)];
+    for(x = 0; x < C; x++){
+      tmp[row + x] = sum / d;
+      sum += src[row + clamp(x + radius + 1, 0, C - 1)]
+           - src[row + clamp(x - radius, 0, C - 1)];
+    }
+  }
+
+  for(x = 0; x < C; x++){
+    sum = 0;
+    for(y = -radius; y <= radius; y++) sum += tmp[clamp(y, 0, R - 1) * C + x];
+    for(y = 0; y < R; y++){
+      out[y * C + x] = sum / d;
+      sum += tmp[clamp(y + radius + 1, 0, R - 1) * C + x]
+           - tmp[clamp(y - radius, 0, R - 1) * C + x];
+    }
+  }
+
+  return out;
+}
+
+function sampleLuminance(img, C, R, blurRadius){
+  var cov = computeCover(img, C, R);
+  if(!cov) return null;
+
+  var c = document.createElement('canvas');
+  c.width = C; c.height = R;
+  var g = c.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(img, cov.sx, cov.sy, cov.sw, cov.sh, 0, 0, C, R);
+
+  var data;
+  try{ data = g.getImageData(0, 0, C, R).data; }
+  catch(e){ return null; }
+
+  var lum = new Float32Array(C * R);
+  var i, r, gg, b, a, R2, G2, B2;
+
+  for(i = 0; i < C * R; i++){
+    r  = data[i * 4];
+    gg = data[i * 4 + 1];
+    b  = data[i * 4 + 2];
+    a  = data[i * 4 + 3] / 255;
+    R2 = r  * a + 255 * (1 - a);
+    G2 = gg * a + 255 * (1 - a);
+    B2 = b  * a + 255 * (1 - a);
+    lum[i] = (0.2126 * R2 + 0.7152 * G2 + 0.0722 * B2) / 255;
+  }
+
+  if(blurRadius > 0) lum = boxBlur(lum, C, R, blurRadius);
+  return lum;
+}
+
+function buildEdgeMap(lum, C, R){
+  var e = new Float32Array(C * R);
+  for(var y = 0; y < R; y++){
+    var y0 = y > 0 ? y - 1 : y;
+    var y1 = y < R - 1 ? y + 1 : y;
+    for(var x = 0; x < C; x++){
+      var x0 = x > 0 ? x - 1 : x;
+      var x1 = x < C - 1 ? x + 1 : x;
+      var gx = lum[y * C + x1] - lum[y * C + x0];
+      var gy = lum[y1 * C + x] - lum[y0 * C + x];
+      var g = Math.sqrt(gx * gx + gy * gy);
+      e[y * C + x] = g > 1 ? 1 : g;
+    }
+  }
+  return e;
+}
+
+var gridCache = new Map();
+
+function getGrid(C, R){
+  var key = state.imgId + '|' + C + 'x' + R + '|' + params.blur;
+  state.lumKey = key;
+
+  var hit = gridCache.get(key);
+  if(hit) return hit;
+
+  var lum = sampleLuminance(state.img, C, R, params.blur);
+  if(!lum) return null;
+
+  var entry = { lum: lum, edge: null, C: C, R: R };
+  gridCache.set(key, entry);
+  if(gridCache.size > GRID_CACHE_MAX){
+    gridCache.delete(gridCache.keys().next().value);
+  }
+  return entry;
+}
+
+function getEdge(entry){
+  if(!entry.edge) entry.edge = buildEdgeMap(entry.lum, entry.C, entry.R);
+  return entry.edge;
+}
+
+/* ============================================================
+   11. 前景 / 背景分离（景深估计）
+   线索：局部细节锐度 + 饱和度 + 与画面边框色的差异，再乘居中先验
+   —— 若图片本身带透明通道（PNG 抠图），直接以 alpha 为主
+   ============================================================ */
+function normalizeField(src, n, loP, hiP){
+  var sample = [];
+  var stepN = Math.max(1, Math.floor(n / 4096));
+  var i;
+  for(i = 0; i < n; i += stepN) sample.push(src[i]);
+  sample.sort(function(a, b){ return a - b; });
+
+  var lo = sample[Math.floor(sample.length * loP)] || 0;
+  var hi = sample[Math.min(sample.length - 1, Math.floor(sample.length * hiP))] || 0;
+
+  var out = new Float32Array(n);
+  var span = hi - lo;
+  if(span < 1e-4) return out;      /* 画面过于均匀 → 全 0，交给阈值处理 */
+
+  var inv = 1 / span;
+  for(i = 0; i < n; i++){
+    var v = (src[i] - lo) * inv;
+    out[i] = v < 0 ? 0 : (v > 1 ? 1 : v);
+  }
+  return out;
+}
+
+function borderMedian(data, mw, mh){
+  var rs = [], gs = [], bs = [];
+  var ring = Math.max(1, Math.round(Math.min(mw, mh) * 0.06));
+  var x, y, i;
+
+  for(y = 0; y < mh; y++){
+    for(x = 0; x < mw; x++){
+      if(x >= ring && x < mw - ring && y >= ring && y < mh - ring) continue;
+      i = (y * mw + x) * 4;
+      rs.push(data[i]); gs.push(data[i + 1]); bs.push(data[i + 2]);
+    }
+  }
+  if(!rs.length) return [1, 1, 1];
+
+  rs.sort(function(a, b){ return a - b; });
+  gs.sort(function(a, b){ return a - b; });
+  bs.sort(function(a, b){ return a - b; });
+  var mid = rs.length >> 1;
+  return [rs[mid] / 255, gs[mid] / 255, bs[mid] / 255];
+}
+
+function buildForegroundMask(img, mw, mh){
+  var c = document.createElement('canvas');
+  c.width = mw; c.height = mh;
+  var g = c.getContext('2d');
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+
+  var cov = computeCover(img, mw, mh);
+  if(!cov) return null;
+  g.drawImage(img, cov.sx, cov.sy, cov.sw, cov.sh, 0, 0, mw, mh);
+
+  var data;
+  try{ data = g.getImageData(0, 0, mw, mh).data; }
+  catch(e){ return null; }
+
+  var n = mw * mh;
+  var L = new Float32Array(n);
+  var S = new Float32Array(n);
+  var D = new Float32Array(n);
+  var i, x, y;
+
+  var opaque = 0;
+  for(i = 0; i < n; i++){
+    if(data[i * 4 + 3] < 250) opaque++;
+  }
+  var hasAlpha = opaque > n * 0.05;
+
+  for(i = 0; i < n; i++){
+    var r = data[i * 4] / 255;
+    var gg = data[i * 4 + 1] / 255;
+    var b = data[i * 4 + 2] / 255;
+    var mx = r > gg ? (r > b ? r : b) : (gg > b ? gg : b);
+    var mn = r < gg ? (r < b ? r : b) : (gg < b ? gg : b);
+    L[i] = 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+    S[i] = mx > 0.001 ? (mx - mn) / mx : 0;
+  }
+
+  /* 局部细节锐度 */
+  var G = new Float32Array(n);
+  for(y = 0; y < mh; y++){
+    var y0 = y > 0 ? y - 1 : y;
+    var y1 = y < mh - 1 ? y + 1 : y;
+    for(x = 0; x < mw; x++){
+      var x0 = x > 0 ? x - 1 : x;
+      var x1 = x < mw - 1 ? x + 1 : x;
+      var gx = L[y * mw + x1] - L[y * mw + x0];
+      var gy = L[y1 * mw + x] - L[y0 * mw + x];
+      G[y * mw + x] = Math.sqrt(gx * gx + gy * gy);
+    }
+  }
+  var det = boxBlur(G, mw, mh, 2);
+  var sat = boxBlur(S, mw, mh, 2);
+
+  /* 与边框（背景）色的差异 */
+  var bg = borderMedian(data, mw, mh);
+  for(i = 0; i < n; i++){
+    var dr = data[i * 4] / 255 - bg[0];
+    var dg = data[i * 4 + 1] / 255 - bg[1];
+    var db = data[i * 4 + 2] / 255 - bg[2];
+    D[i] = Math.sqrt(dr * dr + dg * dg + db * db);
+  }
+  var col = boxBlur(D, mw, mh, 2);
+
+  var detN = normalizeField(det, n, 0.05, 0.92);
+  var satN = normalizeField(sat, n, 0.05, 0.92);
+  var colN = normalizeField(col, n, 0.05, 0.92);
+
+  /* 合成 */
+  var score = new Float32Array(n);
+  var ccx = (mw - 1) / 2, ccy = (mh - 1) / 2;
+  var maxD = Math.sqrt(ccx * ccx + ccy * ccy) || 1;
+  var bias = clamp(params.fgCenter, 0, 1);
+
+  for(y = 0; y < mh; y++){
+    for(x = 0; x < mw; x++){
+      i = y * mw + x;
+      var base = 0.45 * detN[i] + 0.20 * satN[i] + 0.35 * colN[i];
+
+      if(hasAlpha){
+        /* PNG 抠图：alpha 就是现成的蒙版 */
+        var a = data[i * 4 + 3] / 255;
+        score[i] = a * 0.80 + base * 0.20;
+      }else{
+        var dx = (x - ccx) / maxD;
+        var dy = (y - ccy) / maxD;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var cw = 1 - bias * (1 - clamp(1 - dist, 0, 1));
+        score[i] = base * cw;
+      }
+    }
+  }
+
+  var sc = normalizeField(score, n, 0.02, 0.98);
+
+  /* 阈值 + 平滑过渡 */
+  var thr = clamp(params.fgThreshold, 0.02, 0.98);
+  var soft = 0.14;
+  var t0 = clamp(thr - soft, 0, 1);
+  var t1 = clamp(thr + soft, 0.001, 1);
+  var inv = (t1 - t0) || 1;
+  var mask = new Float32Array(n);
+
+  for(i = 0; i < n; i++){
+    var v = (sc[i] - t0) / inv;
+    v = v < 0 ? 0 : (v > 1 ? 1 : v);
+    mask[i] = v * v * (3 - 2 * v);      /* smoothstep */
+  }
+
+  var feather = Math.round(params.fgFeather);
+  if(feather > 0) mask = boxBlur(mask, mw, mh, feather);
+
+  if(params.fgInvert === 'yes'){
+    for(i = 0; i < n; i++) mask[i] = 1 - mask[i];
+  }
+
+  /* 转成带 alpha 的小画布，供 destination-in 使用 */
+  var mc = document.createElement('canvas');
+  mc.width = mw; mc.height = mh;
+  var mg = mc.getContext('2d');
+  var imgData = mg.createImageData(mw, mh);
+  for(i = 0; i < n; i++){
+    imgData.data[i * 4]     = 255;
+    imgData.data[i * 4 + 1] = 255;
+    imgData.data[i * 4 + 2] = 255;
+    imgData.data[i * 4 + 3] = Math.round(mask[i] * 255);
+  }
+  mg.putImageData(imgData, 0, 0);
+
+  return { mask: mask, w: mw, h: mh, canvas: mc, hasAlpha: hasAlpha };
+}
+
+var maskCache = new Map();
+
+function getMask(){
+  if(!state.img) return null;
+
+  var iw = state.img.naturalWidth  || state.img.width;
+  var ih = state.img.naturalHeight || state.img.height;
+  if(!iw || !ih) return null;
+
+  var scale = MASK_MAX_PX / Math.max(iw, ih);
+  var mw = Math.max(32, Math.round(iw * scale));
+  var mh = Math.max(32, Math.round(ih * scale));
+
+  var key = state.imgId + '|' + mw + 'x' + mh + '|' +
+            params.fgThreshold.toFixed(2) + '|' + params.fgFeather + '|' +
+            params.fgCenter.toFixed(2) + '|' + params.fgInvert;
+  state.maskKey = key;
+
+  var hit = maskCache.get(key);
+  if(hit) return hit;
+
+  var entry = buildForegroundMask(state.img, mw, mh);
+  if(!entry) return null;
+
+  maskCache.set(key, entry);
+  if(maskCache.size > MASK_CACHE_MAX){
+    maskCache.delete(maskCache.keys().next().value);
+  }
+  return entry;
+}
+
+function maskAt(m, x, y, W, H){
+  var ix = (x / W * m.w) | 0;
+  var iy = (y / H * m.h) | 0;
+  if(ix < 0) ix = 0; else if(ix >= m.w) ix = m.w - 1;
+  if(iy < 0) iy = 0; else if(iy >= m.h) iy = m.h - 1;
+  return m.mask[iy * m.w + ix];
+}
+
+/* 主体抠图叠加：离屏画布只创建/调整一次，不每帧新建 */
+var subjectCv = null;
+
+function drawSubject(W, H){
+  var m = getMask();
+  if(!m || !m.canvas) return false;
+
+  var sw = Math.round(W * DPR);
+  var sh = Math.round(H * DPR);
+
+  if(!subjectCv) subjectCv = document.createElement('canvas');
+  if(subjectCv.width !== sw || subjectCv.height !== sh){
+    subjectCv.width = sw;
+    subjectCv.height = sh;
+  }
+
+  var g = subjectCv.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+  g.clearRect(0, 0, sw, sh);
+
+  var cov = computeCover(state.img, sw, sh);
+  if(!cov) return false;
+  g.imageSmoothingEnabled = true;
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(state.img, cov.sx, cov.sy, cov.sw, cov.sh, 0, 0, sw, sh);
+
+  g.globalCompositeOperation = 'destination-in';
+  g.drawImage(m.canvas, 0, 0, sw, sh);
+  g.globalCompositeOperation = 'source-over';
+
+  ctx.globalAlpha = 1;
+  ctx.drawImage(subjectCv, 0, 0, W, H);
+  return true;
+}
+
+/* ============================================================
+   12. 画布尺寸
+   ============================================================ */
+function fitCanvas(){
+  var pad = window.innerWidth <= 780 ? 16 : 34;
+  var availW = Math.max(160, boxEl.clientWidth  - pad * 2);
+  var availH = Math.max(160, boxEl.clientHeight - pad * 2);
+
+  var W = availW, H = availH;
+
+  if(state.img){
+    var iw = state.img.naturalWidth  || state.img.width;
+    var ih = state.img.naturalHeight || state.img.height;
+    if(iw && ih){
+      var ia = iw / ih;
+      var da = availW / availH;
+      if(ia > da) H = availW / ia;
+      else        W = availH * ia;
+    }
+  }
+
+  W = Math.max(200, Math.round(W));
+  H = Math.max(200, Math.round(H));
+
+  state.viewW = W;
+  state.viewH = H;
+
+  cvs.width  = Math.round(W * DPR);
+  cvs.height = Math.round(H * DPR);
+  cvs.style.width  = W + 'px';
+  cvs.style.height = H + 'px';
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  scheduleRender(0);
+}
+
+/* ============================================================
+   13. 渲染
+   ============================================================ */
+var lastFont = '';
+function setFont(size){
+  var f = size.toFixed(2) + 'px ' + FONT_STACK;
+  if(f !== lastFont){ ctx.font = f; lastFont = f; }
+}
+
+/* 密度 → 墨量（各模式共用） */
+function densityAt(x, y, W, H, lum, cols, rows, cfg){
+  var ix = (x / W * cols) | 0;
+  var iy = (y / H * rows) | 0;
+  if(ix < 0) ix = 0; else if(ix >= cols) ix = cols - 1;
+  if(iy < 0) iy = 0; else if(iy >= rows) iy = rows - 1;
+
+  var l = lum[iy * cols + ix];
+  var d = cfg.invert ? (1 - l) : l;
+  d = (d - 0.5) * (params.contrast * cfg.gain) + 0.5;
+  if(d < 0) d = 0; else if(d > 1) d = 1;
+  if(params.gamma !== 1) d = Math.pow(d, params.gamma);
+  return d;
+}
+
+/* ---------- 模式A/B/C 的文字层：逐格铺字 ---------- */
+function drawDensityLayer(W, H, cfg, lum, cols, rows, colPitch, rowPitch, chars){
+  var n = chars.length;
+
+  var sizeMin  = Math.min(params.sizeMin, params.sizeMax) * cfg.sizeLo;
+  var sizeMax  = Math.max(params.sizeMin, params.sizeMax) * cfg.sizeHi;
+  var sizeSpan = sizeMax - sizeMin;
+
+  var alphaMin  = params.alphaMin;
+  var alphaMax  = params.alphaMax * cfg.alphaHi;
+  var alphaSpan = alphaMax - alphaMin;
+
+  var boldMax = params.boldMax;
+  var buckets = new Map();
+  var idx = 0, c, r, x, y;
+
+  function accumulate(ch, px, py){
+    var d = densityAt(px, py, W, H, lum, cols, rows, cfg);
+    if(d < cfg.cutoff) return;
+
+    var size = colPitch * (sizeMin + sizeSpan * d);
+    if(size < MIN_GLYPH) return;
+
+    var alpha = alphaMin + alphaSpan * d;
+    if(alpha < 0.012) return;
+
+    var bold = boldMax * d;
+    var si = Math.round(size * 4);
+    var ai = Math.round(alpha * 24);
+    var bi = Math.round(bold * 8);
+    var key = (si * 25 + ai) * 9 + bi;
+
+    var bucket = buckets.get(key);
+    if(!bucket){
+      bucket = { size: si / 4, alpha: ai / 24, bold: bi / 8, pts: [] };
+      buckets.set(key, bucket);
+    }
+    bucket.pts.push(ch, px, py);
+  }
+
+  if(params.direction === 'vertical'){
+    for(c = 0; c < cols; c++){
+      x = W - (c + 0.5) * colPitch;
+      for(r = 0; r < rows; r++){
+        accumulate(chars[idx % n], x, (r + 0.5) * rowPitch);
+        idx++;
+      }
+    }
+  }else{
+    for(r = 0; r < rows; r++){
+      y = (r + 0.5) * rowPitch;
+      for(c = 0; c < cols; c++){
+        accumulate(chars[idx % n], (c + 0.5) * colPitch, y);
+        idx++;
+      }
+    }
+  }
+
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin     = 'round';
+  ctx.lineCap      = 'round';
+  ctx.fillStyle    = params.ink;
+  ctx.strokeStyle  = params.ink;
+  lastFont = '';
+
+  buckets.forEach(function(b){
+    var pts = b.pts;
+    if(!pts.length) return;
+
+    ctx.globalAlpha = b.alpha;
+    setFont(b.size);
+
+    var i;
+    for(i = 0; i < pts.length; i += 3) ctx.fillText(pts[i], pts[i + 1], pts[i + 2]);
+
+    if(b.bold > 0.045){
+      ctx.lineWidth = b.size * b.bold * 0.105;
+      for(i = 0; i < pts.length; i += 3) ctx.strokeText(pts[i], pts[i + 1], pts[i + 2]);
+    }
+  });
+
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- 模式D 的文字层：词云填满主体轮廓 ---------- */
+function approxWidth(word, size){
+  var w = 0;
+  for(var i = 0; i < word.length; i++){
+    w += (word.charCodeAt(i) < 0x2E80) ? 0.56 : 1.0;
+  }
+  return w * size * 1.04;
+}
+
+var cloudCache = { key: '', list: null };
+
+/* 文字填充的调色板：主色之外，参考图里最常见的那几支强调色 */
+var CLOUD_HUES = ['#B2263A', '#2E4E8F', '#1E7A6A', '#8C2E6E', '#8A6A1E', '#3B3B85'];
+/* 允许的旋转角：0 度出现得多一些，保证整体仍读得出来 */
+var CLOUD_ROT  = [0, 0, 0, 0, 0, -13, 13, -30, 30, -52, 52, 90, -90];
+var CLOUD_BUDGET = 6000;      /* 最多放多少个词 */
+var CLOUD_SCAN_MAX = 26000000; /* 占位检测的总格子数上限，防病态输入卡死 */
+
+function cloudColor(imp, rnd){
+  var v = params.colorVar;
+  if(!v || v <= 0) return params.ink;
+  /* 大词更容易上色 —— 参考图里也是主角词带颜色、碎词是黑的 */
+  var p = v * (0.30 + 0.70 * imp);
+  if(rnd() > p) return params.ink;
+  return CLOUD_HUES[(rnd() * CLOUD_HUES.length) | 0];
+}
+
+/* ------------------------------------------------------------
+   文字填充：词云打包
+   与旧的「逐行扫描」相比，四处改动决定了观感：
+   1) 大词优先 —— 按出现次数降序铺，先让主角词占住最大字号
+   2) 多角度旋转 —— 0/±13/±30/±52/90 度轮换，画面不再是横条纹
+   3) 软重叠 —— 大词独占格子，小词允许压印到已有文字上
+   4) 候选格打乱后顺序取 —— 不再从左上角起铺，横向条带消失
+   ------------------------------------------------------------ */
+function packWordCloud(words, W, H, m, lum, cols, rows, cfg){
+  var key = state.maskKey + '|' + W + 'x' + H + '|' + params.sizeMin + '|' + params.sizeMax + '|' +
+            params.boldMax + '|' + params.alphaMin + '|' + params.colorVar + '|' +
+            state.textVer + '|' + params.segment + '|' + sampleTag();
+  if(cloudCache.key === key && cloudCache.list) return cloudCache.list;
+
+  var STEP = CLOUD_STEP;
+  var gw = Math.ceil(W / STEP), gh = Math.ceil(H / STEP);
+  var occ = new Uint8Array(gw * gh);
+  var free = [];
+  var gx, gy, idx, i;
+
+  /* 蒙版外封死（250 当墙，永远过不了检测），同时收集可用格 */
+  for(gy = 0; gy < gh; gy++){
+    for(gx = 0; gx < gw; gx++){
+      idx = gy * gw + gx;
+      if(maskAt(m, (gx + 0.5) * STEP, (gy + 0.5) * STEP, W, H) < 0.5) occ[idx] = 250;
+      else free.push(idx);
+    }
+  }
+  if(!free.length) return [];
+
+  /* ---------- 词频权重：同一批词里数出现次数 ---------- */
+  var cnt = new Map(), w;
+  for(i = 0; i < words.length; i++){
+    w = words[i];
+    cnt.set(w, (cnt.get(w) || 0) + 1);
+  }
+  var uniq = [];
+  cnt.forEach(function(c, k){ uniq.push({ w: k, c: c }); });
+  if(!uniq.length) return [];
+  uniq.sort(function(a, b){ return b.c - a.c; });
+
+  var maxC = uniq[0].c || 1;
+  var nUniq = uniq.length;
+
+  /* ---------- 字号区间 ---------- */
+  var sizeMinRaw = Math.min(params.sizeMin, params.sizeMax);
+  var sizeMaxRaw = Math.max(params.sizeMin, params.sizeMax);
+  var unit = W / 22;
+  var sMin = Math.max(6.0, unit * 0.22 * (sizeMinRaw / 0.48));
+  var sMax = Math.max(sMin * 2.6, unit * 1.50 * (sizeMaxRaw / 1.18));
+  var sCap = W / 11;
+
+  var rnd = mulberry32(((params.sampleSeed || 1) * 374761393 + state.textVer * 668265263) >>> 0);
+  shuffleArr(free, rnd);
+  var fn = free.length, fc = 0;
+
+  var scanned = 0;
+  var out = [];
+  var placed = 0;
+
+  function blocked(x0, y0, x1, y1, limit){
+    var a0 = (x0 / STEP) | 0, b0 = (y0 / STEP) | 0;
+    var a1 = (x1 / STEP) | 0, b1 = (y1 / STEP) | 0;
+    if(a0 < 0 || b0 < 0 || a1 >= gw || b1 >= gh) return true;
+    scanned += (a1 - a0 + 1) * (b1 - b0 + 1);
+    if(scanned > CLOUD_SCAN_MAX) return true;
+    var a, b, base;
+    for(b = b0; b <= b1; b++){
+      base = b * gw;
+      for(a = a0; a <= a1; a++){ if(occ[base + a] >= limit) return true; }
+    }
+    return false;
+  }
+
+  function claim(x0, y0, x1, y1){
+    var a0 = (x0 / STEP) | 0, b0 = (y0 / STEP) | 0;
+    var a1 = (x1 / STEP) | 0, b1 = (y1 / STEP) | 0;
+    var a, b, base;
+    for(b = b0; b <= b1; b++){
+      base = b * gw;
+      for(a = a0; a <= a1; a++) occ[base + a]++;
+    }
+  }
+
+  var failStreak = 0;
+  /* 词表小的时候（对白、短篇）几轮就放完了，轮廓还是空的。
+     所以不设固定轮数，一直放到「连续 600 次都放不下」为止 —— 那就是真满了。 */
+  var maxPass = Math.min(400, Math.max(16, Math.ceil(3000 / nUniq)));
+
+  for(var pass = 0; pass < maxPass && placed < CLOUD_BUDGET && failStreak < 600; pass++){
+    /* 第一轮铺主角词；之后每一轮都更小、且打乱顺序，
+       同一个词会在不同字号上重复出现 —— 参考图里正是这样把空隙吃干净的。 */
+    var scale = pass === 0 ? 1 : (pass === 1 ? 0.58 : (pass === 2 ? 0.38 : 0.30));
+    var order = pass === 0 ? uniq : shuffleArr(uniq.slice(), rnd);
+
+    for(i = 0; i < nUniq && placed < CLOUD_BUDGET && failStreak < 600; i++){
+      var item = order[i];
+      /* 重要性用**排名**而不是绝对词频：语料长短不同时词频差几个数量级，
+         用排名才能稳定地让「头部少数词大、尾部大量词小」 */
+      var rank = i / Math.max(1, nUniq - 1);
+      var imp = Math.pow(1 - rank, 2.6);
+      var size = (sMin + (sMax - sMin) * imp) * scale;
+      if(size < sMin * 0.85) size = sMin * 0.85;
+      if(size > sCap) size = sCap;
+
+      var wpx = approxWidth(item.w, size);
+      var hpx = size * 1.06;
+      /* 大词独占格子；越小的词越允许压印，最后那些碎词就是在已有文字上叠出来的 */
+      var limit = size > sMin * 2.5 ? 1 : (size > sMin * 1.5 ? 2 : 3);
+      /* 尝试次数按包围盒面积反推：大词一次检测就要扫几千格，给它 90 次会卡住。
+         目标是每个词最多扫 ~6 万格，小词才能拿到足够多次数去找缝。 */
+      var est = (wpx + hpx) * 0.71 / STEP;
+      var tries = Math.max(4, Math.min(90, Math.round(60000 / Math.max(1, est * est))));
+
+    var px = 0, py = 0, rad = 0, bw = 0, bh = 0, ok = false;
+    for(var t = 0; t < tries && !ok; t++){
+      var cell = free[fc % fn];
+      fc++;
+      px = ((cell % gw) + 0.5) * STEP;
+      py = (((cell / gw) | 0) + 0.5) * STEP;
+
+      /* 小字保持水平：一是贴近参考图（碎字基本都是横排），
+         二是每转一次都要重新栅格化字形，全部旋转会让绘制慢几十倍 */
+      var canRot = size > sMin * 1.7;
+      rad = (canRot && rnd() < 0.85)
+        ? CLOUD_ROT[(rnd() * CLOUD_ROT.length) | 0] * Math.PI / 180
+        : 0;
+      var ca = Math.abs(Math.cos(rad)), sa = Math.abs(Math.sin(rad));
+      bw = wpx * ca + hpx * sa;
+      bh = wpx * sa + hpx * ca;
+      if(bw > W || bh > H) continue;
+      if(blocked(px - bw * 0.5, py - bh * 0.5, px + bw * 0.5, py + bh * 0.5, limit)) continue;
+      ok = true;
+    }
+
+    if(!ok){ failStreak++; continue; }
+    failStreak = 0;
+
+    claim(px - bw * 0.5, py - bh * 0.5, px + bw * 0.5, py + bh * 0.5);
+
+    /* 字号完全由词的重要性决定（轮廓才清晰），原图的明暗只用**透明度**留一点暗示 */
+    var d = densityAt(px, py, W, H, lum, cols, rows, cfg);
+
+    out.push({
+      t: item.w,
+      x: px,
+      y: py,
+      s: Math.round(size * 4) / 4,
+      r: rad,
+      a: clamp((0.58 + 0.42 * imp) * (0.74 + 0.26 * d), 0, 1),
+      b: params.boldMax * (0.20 + 0.80 * imp),
+      c: cloudColor(imp, rnd)
+    });
+    placed++;
+    }   /* for i */
+  }     /* for pass */
+
+  cloudCache.key = key;
+  cloudCache.list = out;
+  return out;
+}
+
+function drawCloudLayer(W, H, cfg, m, lum, cols, rows){
+  var words = getWords();
+  if(!words.length) return;
+
+  var placed = packWordCloud(words, W, H, m, lum, cols, rows, cfg);
+  if(!placed.length) return;
+
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin     = 'round';
+  ctx.lineCap      = 'round';
+  lastFont = '';
+
+  /* 用 setTransform 直接摆矩阵，而不是每个词 save/rotate/restore ——
+     后者在软件光栅化下每次都要压栈整份绘图状态，2000 个词会拖到几百毫秒。 */
+  var tilted = false;
+  function untilt(){
+    if(tilted){ ctx.setTransform(DPR, 0, 0, DPR, 0, 0); tilted = false; }
+  }
+
+  for(var i = 0; i < placed.length; i++){
+    var it = placed[i];
+    ctx.globalAlpha = it.a;
+    setFont(it.s);
+    ctx.fillStyle   = it.c;
+    ctx.strokeStyle = it.c;
+
+    if(it.r){
+      var co = Math.cos(it.r), si = Math.sin(it.r);
+      ctx.setTransform(DPR * co, DPR * si, -DPR * si, DPR * co, DPR * it.x, DPR * it.y);
+      tilted = true;
+      ctx.fillText(it.t, 0, 0);
+      if(it.b > 0.045){
+        ctx.lineWidth = it.s * it.b * 0.105;
+        ctx.strokeText(it.t, 0, 0);
+      }
+    }else{
+      untilt();
+      ctx.fillText(it.t, it.x, it.y);
+      if(it.b > 0.045){
+        ctx.lineWidth = it.s * it.b * 0.105;
+        ctx.strokeText(it.t, it.x, it.y);
+      }
+    }
+  }
+  untilt();
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- 主渲染 ---------- */
+function render(){
+  var W = state.viewW, H = state.viewH;
+  if(W <= 0 || H <= 0) return;
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = params.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  var cfg = MODE_CFG[params.mode] || MODE_CFG.yang;
+
+  var stream = getStream();
+  var hasText = cfg.words ? getWords().length > 0 : stream.length > 0;
+
+  if(!state.img || !hasText){
+    emptyTip.style.display = 'flex';
+    return;
+  }
+  emptyTip.style.display = 'none';
+
+  /* ---------- 网格（供密度采样） ---------- */
+  var C = Math.max(8, Math.round(params.cols));
+  var colPitch = W / C;
+
+  /* 画布偏窄时（手机竖屏 / 小窗口），按列数算出的字号会低于 MIN_GLYPH，
+     drawDensityLayer 会把每个格子都静默跳过，结果是整幅空白。
+     这里按「最小可读字号」反推列数上限，宁可少排几列也不要白屏。 */
+  var sizeFloor = Math.min(params.sizeMin, params.sizeMax) * cfg.sizeLo;
+  if(sizeFloor > 0.02){
+    var needPitch = MIN_GLYPH / sizeFloor;
+    if(colPitch < needPitch){
+      C = Math.max(8, Math.min(C, Math.floor(W / needPitch)));
+      colPitch = W / C;
+    }
+  }
+
+  var rowPitch = colPitch * CELL_RATIO;
+  var R = Math.max(4, Math.floor(H / rowPitch));
+  var guard = 0;
+  while(C * R > cfg.cap && C > 20 && guard++ < 80){
+    C = Math.round(C * 0.9);
+    colPitch = W / C;
+    rowPitch = colPitch * CELL_RATIO;
+    R = Math.max(4, Math.floor(H / rowPitch));
+  }
+
+  var entry = getGrid(C, R);
+  if(!entry){
+    toast('图像像素读取失败（可能是跨域限制或图像损坏）');
+    return;
+  }
+  var lum = entry.lum;
+
+  /* ---------- 背景图（可选，垫在文字下面） ---------- */
+  if(cfg.wash && params.bgWash > 0.002){
+    var covW = computeCover(state.img, W, H);
+    if(covW){
+      ctx.globalAlpha = params.bgWash;
+      ctx.drawImage(state.img, covW.sx, covW.sy, covW.sw, covW.sh, 0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ---------- 文字层 ---------- */
+  if(cfg.words){
+    var m = getMask();
+    if(!m){
+      toast('前景识别失败（图像像素不可读）');
+      return;
+    }
+    drawCloudLayer(W, H, cfg, m, lum, C, R);
+  }else{
+    drawDensityLayer(W, H, cfg, lum, C, R, colPitch, rowPitch, stream);
+  }
+
+  /* ---------- 模式C：主体抠图叠加在文字之上 ---------- */
+  if(cfg.subject){
+    drawSubject(W, H);
+  }
+}
+
+/* ============================================================
+   14. 渲染调度：rAF + 防抖
+   ============================================================ */
+var rafId = 0, debTimer = 0, busyTimer = 0;
+
+function paintNow(){
+  if(rafId) return;
+
+  if(busyTimer) clearTimeout(busyTimer);
+  busyTimer = setTimeout(function(){
+    busyTimer = 0;
+    busyEl.textContent = '渲染中…';
+    busyEl.classList.add('on');
+  }, 140);
+
+  rafId = requestAnimationFrame(function(){
+    rafId = 0;
+    try{
+      render();
+    }catch(err){
+      toast('渲染出错：' + (err && err.message ? err.message : err));
+    }finally{
+      if(busyTimer){ clearTimeout(busyTimer); busyTimer = 0; }
+      busyEl.classList.remove('on');
+    }
+  });
+}
+
+function scheduleRender(delay){
+  var d = (delay === undefined) ? DEBOUNCE : delay;
+  if(debTimer){ clearTimeout(debTimer); debTimer = 0; }
+  if(d <= 0){ paintNow(); return; }
+  debTimer = setTimeout(function(){
+    debTimer = 0;
+    paintNow();
+  }, d);
+}
+
+function renderNow(){
+  if(debTimer){ clearTimeout(debTimer); debTimer = 0; }
+  paintNow();
+}
+
+/* ============================================================
+   15. 文本应用
+   ============================================================ */
+var textInput = document.getElementById('textInput');
+var textMeta  = document.getElementById('textMeta');
+
+function applyText(txt){
+  state.text = txt || '';
+  state.textVer++;
+  state.streamKey = '';
+  state.wordsKey = '';
+  cloudCache.key = '';
+
+  /* 换文本了，之前排除的词对不上号，清掉 */
+  if(freqExcluded.size){ freqExcluded.clear(); freqExclVer++; }
+
+  textInput.value = state.text.length > 4000
+    ? state.text.slice(0, 4000) + '\n…（已截断显示，实际使用全文）'
+    : state.text;
+
+  var count = getStream().length;
+  var wc = getWords().length;
+
+  var langName = (LANGS[getLang()] || LANGS.ja).name;
+  textMeta.textContent = count
+    ? '已提取 ' + state.text.replace(/[\s\u3000]+/g, '').length.toLocaleString() +
+      ' 字 · 可用 ' + count.toLocaleString() + ' 字 / ' + wc.toLocaleString() + ' 词 · ' + langName
+    : '未提取到可用文字';
+
+  /* 手动指定了语言却一个字都提不出来 —— 多半是选错了，顺手提示一下 */
+  if(!count && params.lang !== 'auto' && state.text){
+    var det = detectLang(state.text);
+    if(det !== params.lang){
+      textMeta.textContent += '（当前语言设为「' + langName + '」，但文本更像「' +
+        (LANGS[det] || LANGS.ja).name + '」）';
+    }
+  }
+
+  /* 开了「仅取台词」时把实际取到的台词量也标出来 */
+  if(dialogueActive()){
+    var dTxt = getDialogueText();
+    textMeta.textContent += dTxt
+      ? ' · 仅台词 ' + dTxt.replace(/[\s\u3000]+/g, '').length.toLocaleString() + ' 字'
+      : ' · 仅台词（未找到，已用全文）';
+  }
+  syncDialogueHint();
+  textMeta.className = 'meta' + (count ? ' ok' : ' warn');
+
+  /* 自动模式下换文本会重新识别语言，换了就提示一声 */
+  var lgNow = getLang();
+  if(params.lang === 'auto' && lgNow !== autoLangLast){
+    autoLangLast = lgNow;
+    toast('已识别为「' + langName + '」，可手动切换');
+  }
+
+  syncFreqPreview();
+  scheduleRender(DEBOUNCE);
+}
+
+var autoLangLast = '';
+
+textInput.addEventListener('input', function(){
+  applyText(textInput.value);
+}, { passive: true });
+
+/* ============================================================
+   16. 文本文件处理
+   ============================================================ */
+function setBusy(msg){
+  if(msg){ busyEl.textContent = msg; busyEl.classList.add('on'); }
+  else busyEl.classList.remove('on');
+}
+
+function reportTextResult(info, prefix){
+  var count = getStream().length;
+  var tail = (info.enc ? ' · ' + info.enc : '') +
+             (info.bilingual ? ' · 已过滤中文译文' : '') +
+             (info.garbled ? ' · 疑似乱码' : '');
+
+  textMeta.className = 'meta ' + (count ? (info.garbled ? 'warn' : 'ok') : 'warn');
+  textMeta.textContent = (count ? '已提取 ' + state.text.replace(/[\s\u3000]+/g, '').length.toLocaleString() + ' 字' : '未提取到可用文字') + tail;
+
+  toast((prefix || '文本载入完成') +
+        (count ? ' · 可用 ' + count.toLocaleString() + ' 字' : '') +
+        (info.garbled ? '（疑似乱码，请检查编码）' : ''));
+}
+
+function handleTextFile(file){
+  if(!file) return;
+
+  var name = file.name || '';
+  var isEpub = /\.epub$/i.test(name) || file.type === 'application/epub+zip';
+  var isHtml = /\.(x?html?|htm)$/i.test(name);
+
+  if(isEpub){
+    setBusy('解析 EPUB…');
+    textMeta.textContent = '解析 EPUB…';
+    textMeta.className = 'meta';
+
+    parseEPUB(file).then(function(res){
+      setBusy('');
+      applyText(res.text);
+      reportTextResult(res, 'EPUB 解析完成');
+    }).catch(function(err){
+      setBusy('');
+      var msg = (err && err.message) ? err.message : '未知错误';
+      textMeta.textContent = 'EPUB 解析失败：' + msg;
+      textMeta.className = 'meta warn';
+      toast('EPUB 解析失败：' + msg);
+    });
+    return;
+  }
+
+  if(isHtml){
+    setBusy('解析 HTML…');
+    var frh = new FileReader();
+    frh.onload = function(e){
+      try{
+        var dec = decodeBytes(e.target.result);
+        var doc = new DOMParser().parseFromString(dec.text, 'text/html');
+        var blocks = docBlocks(doc);
+        if(!blocks.length) throw new Error('页面中没有可提取的正文');
+        var text = normalizeText(blocksToText([blocks], false));
+        if(!text) throw new Error('清洗后正文为空');
+        setBusy('');
+        applyText(text);
+        reportTextResult({ enc: dec.enc, garbled: garbledRatio(dec.text) > 0.005, bilingual: false }, 'HTML 解析完成');
+      }catch(err){
+        setBusy('');
+        var m2 = (err && err.message) ? err.message : '未知错误';
+        textMeta.textContent = 'HTML 解析失败：' + m2;
+        textMeta.className = 'meta warn';
+        toast('HTML 解析失败：' + m2);
+      }
+    };
+    frh.onerror = function(){
+      setBusy('');
+      textMeta.textContent = '文件读取失败';
+      textMeta.className = 'meta warn';
+      toast('文件读取失败');
+    };
+    frh.readAsArrayBuffer(file);
+    return;
+  }
+
+  setBusy('读取文本…');
+  var fr = new FileReader();
+  fr.onload = function(e){
+    setBusy('');
+    try{
+      var dec = decodeBytes(e.target.result);
+      var text = normalizeText(dec.text);
+      if(!text){
+        textMeta.textContent = '文件中未提取到文本';
+        textMeta.className = 'meta warn';
+        toast('文件中未提取到文本');
+        return;
+      }
+      applyText(text);
+      reportTextResult({ enc: dec.enc, garbled: garbledRatio(dec.text) > 0.005, bilingual: false }, '文本载入完成');
+    }catch(err){
+      textMeta.textContent = '文本解码失败';
+      textMeta.className = 'meta warn';
+      toast('文本解码失败：' + (err && err.message ? err.message : '未知错误'));
+    }
+  };
+  fr.onerror = function(){
+    setBusy('');
+    textMeta.textContent = '文件读取失败';
+    textMeta.className = 'meta warn';
+    toast('文件读取失败');
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+/* ============================================================
+   17. 图像应用
+   ============================================================ */
+var imgMeta = document.getElementById('imgMeta');
+
+function applyImage(file){
+  if(!file) return;
+  if(file.type && !/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name || '')){
+    toast('这不是可识别的图片格式');
+    return;
+  }
+
+  setBusy('载入图像…');
+  var fr = new FileReader();
+  fr.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      setBusy('');
+      state.img = img;
+      state.imgId++;
+      gridCache.clear();
+      maskCache.clear();
+      cloudCache.key = '';
+      state.lumKey = '';
+      state.maskKey = '';
+      imgMeta.textContent = img.naturalWidth + ' × ' + img.naturalHeight + ' px';
+      imgMeta.className = 'meta ok';
+      fitCanvas();
+      toast('图像载入完成');
+    };
+    img.onerror = function(){
+      setBusy('');
+      imgMeta.textContent = '图片解码失败';
+      imgMeta.className = 'meta warn';
+      toast('图片解码失败（文件可能损坏）');
+    };
+    img.src = e.target.result;
+  };
+  fr.onerror = function(){
+    setBusy('');
+    imgMeta.textContent = '图片读取失败';
+    imgMeta.className = 'meta warn';
+    toast('图片读取失败');
+  };
+  fr.readAsDataURL(file);
+}
+
+/* ============================================================
+   18. 拖放绑定
+   ============================================================ */
+function bindDrop(dropEl, inputEl, handler){
+  dropEl.addEventListener('click', function(){ inputEl.click(); });
+
+  inputEl.addEventListener('change', function(){
+    if(inputEl.files && inputEl.files[0]) handler(inputEl.files[0]);
+    inputEl.value = '';
+  });
+
+  ['dragenter', 'dragover'].forEach(function(ev){
+    dropEl.addEventListener(ev, function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      dropEl.classList.add('over');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(function(ev){
+    dropEl.addEventListener(ev, function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      if(ev === 'dragleave' && dropEl.contains(e.relatedTarget)) return;
+      dropEl.classList.remove('over');
+    });
+  });
+
+  dropEl.addEventListener('drop', function(e){
+    var dt = e.dataTransfer;
+    if(dt && dt.files && dt.files[0]) handler(dt.files[0]);
+  });
+}
+
+bindDrop(document.getElementById('dropText'), document.getElementById('fileText'), handleTextFile);
+bindDrop(document.getElementById('dropImg'),  document.getElementById('fileImg'),  applyImage);
+
+/* ============================================================
+   19. 控件绑定
+   ============================================================ */
+var rangeBindings = [];
+
+function fmtVal(v, digits){
+  return digits > 0 ? v.toFixed(digits) : String(v);
+}
+
+function bindRange(id, valId, key, digits, invalidate){
+  var el  = document.getElementById(id);
+  var val = document.getElementById(valId);
+  if(!el) return;
+
+  rangeBindings.push({ el: el, val: val, key: key, digits: digits });
+
+  el.addEventListener('input', function(){
+    params[key] = parseFloat(el.value);
+    val.textContent = fmtVal(params[key], digits);
+    if(invalidate) invalidate();
+    scheduleRender(DEBOUNCE);
+  }, { passive: true });
+
+  el.addEventListener('change', function(){
+    params[key] = parseFloat(el.value);
+    val.textContent = fmtVal(params[key], digits);
+    if(invalidate) invalidate();
+    renderNow();
+  });
+}
+
+bindRange('rCols',       'vCols',       'cols',       0, function(){ cloudCache.key = ''; });
+bindRange('rSizeMin',    'vSizeMin',    'sizeMin',    2, function(){ cloudCache.key = ''; });
+bindRange('rSizeMax',    'vSizeMax',    'sizeMax',    2, function(){ cloudCache.key = ''; });
+bindRange('rBold',       'vBold',       'boldMax',    2, function(){ cloudCache.key = ''; });
+bindRange('rAlpha',      'vAlpha',      'alphaMin',   2, function(){ cloudCache.key = ''; });
+bindRange('rContrast',   'vContrast',   'contrast',   2);
+bindRange('rGamma',      'vGamma',      'gamma',      2);
+bindRange('rBlur',       'vBlur',       'blur',       0);
+bindRange('rFgThr',      'vFgThr',      'fgThreshold',2);
+bindRange('rFgFeather',  'vFgFeather',  'fgFeather',  0);
+bindRange('rFgCenter',   'vFgCenter',   'fgCenter',   2);
+bindRange('rBgWash',     'vBgWash',     'bgWash',     2);
+bindRange('rColorVar',   'vColorVar',   'colorVar',   2, function(){ cloudCache.key = ''; });
+
+/* ---------- 通用分段控件 / 模式网格 ---------- */
+function setSegActive(seg, attr, value){
+  Array.prototype.forEach.call(seg.children, function(x){
+    x.classList.toggle('on', x.getAttribute(attr) === value);
+  });
+}
+
+function bindSeg(segId, attr, key, onChange){
+  var seg = document.getElementById(segId);
+  if(!seg) return null;
+
+  seg.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if(!b || !seg.contains(b)) return;
+    var v = b.getAttribute(attr);
+    if(!v) return;
+
+    setSegActive(seg, attr, v);
+    params[key] = v;
+    if(onChange) onChange(v);
+  });
+  return seg;
+}
+
+bindSeg('segDir', 'data-dir', 'direction', function(){ renderNow(); });
+
+/* ★ 文本语言 —— 换语言要重建分词器，并让所有取词缓存失效 */
+bindSeg('segLang', 'data-lang', 'lang', function(){
+  refreshSegmenter();
+  syncLangHint();
+  invalidateText();
+  syncFreqPreview();
+  if(!SEG_SUPPORTED){
+    toast('当前浏览器不支持 Intl.Segmenter，已自动降级');
+  }else if(params.sample === 'freq' && !analyzeFrequency().kept){
+    toast('这个语言下没筛出实义词，换个语言或放宽到「宽松」');
+  }
+  renderNow();
+});
+
+function syncLangHint(){
+  var el = document.getElementById('langHint');
+  if(!el || el.children.length < 2) return;
+  el.children[1].textContent = '当前生效：' + (LANGS[getLang()] || LANGS.ja).name;
+}
+
+var segHint = document.getElementById('segHint');
+bindSeg('segSeg', 'data-seg', 'segment', function(v){
+  state.streamKey = '';
+  state.wordsKey = '';
+  cloudCache.key = '';
+  syncSegHint();
+  if(v === 'word' && !segmenter){
+    toast('当前浏览器不支持 Intl.Segmenter，已自动降级');
+  }
+  renderNow();
+});
+
+function syncSegHint(){
+  if(!segHint || segHint.children.length < 2) return;
+  segHint.children[0].classList.toggle('on', params.segment === 'word');
+  segHint.children[1].classList.toggle('on', params.segment === 'char');
+}
+
+/* ★ 取词范围 —— 顺序 / 乱序·句 / 乱序·词 / 高频词 */
+function invalidateText(){
+  sampleCache.key = '';
+  state.streamKey = '';
+  state.wordsKey = '';
+  cloudCache.key = '';
+}
+
+bindSeg('segSample', 'data-sample', 'sample', function(){
+  invalidateText();
+  syncFreqPreview();
+  if(params.sample === 'freq' && !analyzeFrequency().kept){
+    toast('这段文本没筛出实义词，试试放宽到「宽松」');
+  }
+  renderNow();
+});
+
+/* ★ 高频词严格度 —— 只影响筛选门槛，不重新解析原文 */
+bindSeg('segStrict', 'data-strict', 'freqStrict', function(){
+  invalidateText();
+  syncFreqPreview();
+  renderNow();
+});
+
+/* ---------- 高频词预览：列出识别结果，点词可排除 ---------- */
+function escHtml(s){
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+var fpChipsEl = document.getElementById('fpChips');
+var fpCountEl = document.getElementById('fpCount');
+
+function syncFreqPreview(){
+  var box = document.getElementById('freqPreview');
+  var strictEl = document.getElementById('segStrict');
+  var on = (params.sample === 'freq');
+
+  syncLangHint();
+  if(strictEl) strictEl.classList.toggle('hide', !on);
+  if(box) box.classList.toggle('hide', !on);
+  if(!on || !fpChipsEl) return;
+
+  var a = analyzeFrequency();
+  if(fpCountEl) fpCountEl.textContent = a.kept.toLocaleString();
+  var langEl = document.getElementById('fpLang');
+  if(langEl) langEl.textContent = (LANGS[a.lang] || LANGS.ja).name;
+
+  var html = '', i, t;
+  var n = Math.min(20, a.words.length);
+  for(i = 0; i < n; i++){
+    t = a.words[i];
+    html += '<button type="button" class="chip" data-w="' + escHtml(t.w) + '">' +
+            escHtml(t.w) + '<i>' + t.freq + '</i></button>';
+  }
+  /* 已排除的也列出来，再点一次可以恢复 */
+  freqExcluded.forEach(function(w){
+    html += '<button type="button" class="chip off" data-w="' + escHtml(w) + '">' +
+            escHtml(w) + '<i>×</i></button>';
+  });
+
+  fpChipsEl.innerHTML = html || '<span class="fpHead">没有筛出实义词</span>';
+}
+
+if(fpChipsEl){
+  fpChipsEl.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button.chip') : null;
+    if(!b) return;
+    var w = b.getAttribute('data-w');
+    if(!w) return;
+    if(freqExcluded.has(w)) freqExcluded.delete(w);
+    else freqExcluded.add(w);
+    freqExclVer++;
+    invalidateText();
+    syncFreqPreview();
+    renderNow();
+  });
+}
+
+var btnFpReset = document.getElementById('btnFpReset');
+if(btnFpReset){
+  btnFpReset.addEventListener('click', function(){
+    if(!freqExcluded.size){ toast('当前没有排除任何词'); return; }
+    freqExcluded.clear();
+    freqExclVer++;
+    invalidateText();
+    syncFreqPreview();
+    renderNow();
+    toast('已清空排除');
+  });
+}
+
+var btnReshuffle = document.getElementById('btnReshuffle');
+if(btnReshuffle){
+  btnReshuffle.addEventListener('click', function(){
+    if(!state.text){
+      toast('请先载入小说文本');
+      return;
+    }
+    if(params.sample === 'seq'){
+      toast('顺序模式下文字是固定的，先切到乱序或高频词');
+      return;
+    }
+    params.sampleSeed = (params.sampleSeed + 1) >>> 0 || 1;
+    invalidateText();
+    renderNow();
+    toast('已换一批文字');
+  });
+}
+
+/* ★ 渲染模式 —— 只重绘，不重新解析文本或图像 */
+var subOpts = document.getElementById('subOpts');
+bindSeg('modeGrid', 'data-mode', 'mode', function(){
+  syncModeUI();
+  /* 「仅取台词」只在文字底纹/文字填充生效，切模式会改变取词范围 */
+  if(params.dialogueOnly === 'yes') invalidateText();
+  renderNow();
+});
+
+function syncModeUI(){
+  var cfg = MODE_CFG[params.mode] || MODE_CFG.yang;
+  if(subOpts) subOpts.classList.toggle('hide', !(cfg.subject || cfg.words));
+  /* 彩色变化只作用于「文字填充」 */
+  var cv = document.getElementById('wrapColorVar');
+  if(cv) cv.classList.toggle('hide', !cfg.words);
+  syncDialogueHint();
+}
+
+/* 仅取台词 */
+bindSeg('segDialogue', 'data-dlg', 'dialogueOnly', function(){
+  invalidateText();
+  syncDialogueHint();
+  if(dialogueActive() && !getDialogueText()){
+    toast('这段文本里没找到「」『』“” 或「：」的台词，已退回全文');
+  }
+  renderNow();
+});
+
+function syncDialogueHint(){
+  var el = document.getElementById('dlgHint');
+  if(!el) return;
+  if(!dialogueActive()){ el.textContent = '当前：全部文字'; return; }
+  var d = getDialogueText();
+  var n = d ? d.replace(/[\s\u3000]+/g, '').length : 0;
+  el.textContent = n
+    ? '当前：仅台词 · 抓到 ' + n.toLocaleString() + ' 字'
+    : '当前：仅台词 · 没抓到台词，已退回全文';
+}
+
+/* 蒙版反相 */
+bindSeg('segFgInvert', 'data-fginv', 'fgInvert', function(){ renderNow(); });
+
+/* 颜色 */
+var cInk = document.getElementById('cInk');
+var cBg  = document.getElementById('cBg');
+
+cInk.addEventListener('input', function(){
+  params.ink = cInk.value;
+  scheduleRender(DEBOUNCE);
+}, { passive: true });
+cInk.addEventListener('change', function(){ params.ink = cInk.value; renderNow(); });
+
+cBg.addEventListener('input', function(){
+  params.bg = cBg.value;
+  scheduleRender(DEBOUNCE);
+}, { passive: true });
+cBg.addEventListener('change', function(){ params.bg = cBg.value; renderNow(); });
+
+/* ---------- 全部控件 ← params ---------- */
+function syncControls(){
+  var i, b;
+
+  for(i = 0; i < rangeBindings.length; i++){
+    b = rangeBindings[i];
+    b.el.value = params[b.key];
+    b.val.textContent = fmtVal(params[b.key], b.digits);
+  }
+
+  cInk.value = params.ink;
+  cBg.value  = params.bg;
+
+  var segDir = document.getElementById('segDir');
+  if(segDir) setSegActive(segDir, 'data-dir', params.direction);
+
+  var segSeg = document.getElementById('segSeg');
+  if(segSeg) setSegActive(segSeg, 'data-seg', params.segment);
+
+  var segLangEl = document.getElementById('segLang');
+  if(segLangEl) setSegActive(segLangEl, 'data-lang', params.lang);
+  refreshSegmenter();
+  syncLangHint();
+
+  var segSampleEl = document.getElementById('segSample');
+  if(segSampleEl) setSegActive(segSampleEl, 'data-sample', params.sample);
+
+  var segStrictEl = document.getElementById('segStrict');
+  if(segStrictEl) setSegActive(segStrictEl, 'data-strict', params.freqStrict);
+
+  var segInv = document.getElementById('segFgInvert');
+  if(segInv) setSegActive(segInv, 'data-fginv', params.fgInvert);
+
+  var segDlg = document.getElementById('segDialogue');
+  if(segDlg) setSegActive(segDlg, 'data-dlg', params.dialogueOnly);
+
+  var grid = document.getElementById('modeGrid');
+  if(grid) setSegActive(grid, 'data-mode', params.mode);
+
+  syncSegHint();
+  syncModeUI();
+  syncFreqPreview();
+}
+
+/* ============================================================
+   20. 按钮
+   ============================================================ */
+document.getElementById('btnRender').addEventListener('click', function(){
+  if(!state.text || !getStream().length){
+    toast('请先载入小说文本');
+    return;
+  }
+  if(!state.img){
+    toast('请先载入参考图像');
+    return;
+  }
+  gridCache.clear();
+  maskCache.clear();
+  cloudCache.key = '';
+  renderNow();
+  toast('已重新生成');
+});
+
+document.getElementById('btnExport').addEventListener('click', function(){
+  if(!getStream().length){
+    toast('还没有文本，先载入 EPUB / TXT');
+    return;
+  }
+  if(!state.img){
+    toast('还没有参考图像，先载入一张图片');
+    return;
+  }
+  try{
+    var url = cvs.toDataURL('image/png');
+    var a = document.createElement('a');
+    a.download = 'QI文字成画_' + Date.now() + '.png';
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('PNG 已导出');
+  }catch(e){
+    toast('导出失败：' + (e && e.message ? e.message : '浏览器安全限制'));
+  }
+});
+
+document.getElementById('btnReset').addEventListener('click', function(){
+  var k;
+  for(k in DEFAULT_PARAMS){
+    if(Object.prototype.hasOwnProperty.call(DEFAULT_PARAMS, k)) params[k] = DEFAULT_PARAMS[k];
+  }
+  cloudCache.key = '';
+  invalidateText();
+  syncControls();
+  renderNow();
+  toast('已恢复默认参数');
+});
+
+/* ============================================================
+   21. 窗口尺寸
+   ============================================================ */
+var resizeTimer = 0;
+function onResize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  if(resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function(){
+    resizeTimer = 0;
+    fitCanvas();
+  }, 160);
+}
+window.addEventListener('resize', onResize, { passive: true });
+window.addEventListener('orientationchange', function(){
+  setTimeout(onResize, 240);
+}, { passive: true });
+
+/* ============================================================
+   22. 使用说明弹窗
+   ============================================================ */
+var introEl    = document.getElementById('intro');
+var btnIntroOk = document.getElementById('btnIntroOk');
+
+function closeIntro(){
+  if(!introEl || !introEl.classList.contains('on')) return;
+  introEl.classList.remove('on');
+}
+
+if(introEl){
+  if(btnIntroOk) btnIntroOk.addEventListener('click', closeIntro);
+
+  /* 点遮罩空白处也关掉 */
+  introEl.addEventListener('click', function(e){
+    if(e.target === introEl) closeIntro();
+  });
+
+  /* Esc 关掉 */
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' || e.key === 'Esc') closeIntro();
+  });
+
+  /* 等一帧再加 .on，否则初始样式还没提交，淡入动画会被跳过 */
+  setTimeout(function(){ introEl.classList.add('on'); }, 60);
+}
+
+/* ============================================================
+   23. 启动
+   ============================================================ */
+syncControls();
+fitCanvas();
+emptyTip.style.display = 'flex';
+
+if(!window.JSZip){
+  console.warn('[QI文字成画] JSZip 未加载，EPUB 解析不可用。');
+  var dt = document.getElementById('dropText');
+  if(dt){
+    var fmt = dt.querySelector('.fmt');
+    if(fmt) fmt.textContent = 'EPUB 解析组件未就绪（.txt / .html 仍可用）';
+  }
+}
+if(!segmenter){
+  if(segHint && segHint.children.length){
+    segHint.children[0].textContent = '分词 · 当前浏览器不支持 Intl.Segmenter，已降级';
+  }
+}
+
+})();
+</script>
+</body>
+</html>
