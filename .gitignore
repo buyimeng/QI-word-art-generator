@@ -1,0 +1,38 @@
+# ===== 本地测试 / 提取产物（绝不入库）=====
+提取输出/
+wa2_probe/
+*.epub
+*.txt.bak
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.pak
+*.tga
+*.zip
+*.7z
+
+# ===== 密钥 / 环境 / 凭据（绝不入库）=====
+.env
+*.env
+*.env.*
+*.key
+*.pem
+id_rsa*
+id_dsa*
+*.token
+credentials.json
+
+# ===== 系统 / 编辑器 / 依赖 =====
+.DS_Store
+Thumbs.db
+desktop.ini
+node_modules/
+.vscode/
+.idea/
